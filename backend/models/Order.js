@@ -1,26 +1,36 @@
-export const orders = [
-  {
-    id: 'ORD001',
-    customerName: 'Juan Pérez',
-    customerPhone: '5512345678',
-    pickupTime: '10:00 AM',
-    status: 'Pendiente',
-    items: [
-      { productId: '1', name: 'Arrachera Marinada', quantity: 2, unit: 'kg', price: 180.00 },
-      { productId: '2', name: 'Chorizo Argentino', quantity: 5, unit: 'pieza', price: 90.00 },
-    ],
-    total: 810.00,
+import mongoose from 'mongoose';
+
+const orderSchema = new mongoose.Schema({
+  customerName: { type: String, required: true },
+  customerPhone: { type: String, required: true },
+  customer: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User', // Relación con el modelo de usuario
   },
-  {
-    id: 'ORD002',
-    customerName: 'María García',
-    customerPhone: '5587654321',
-    pickupTime: '02:00 PM',
-    status: 'Completado',
-    items: [
-      { productId: '3', name: 'Costillas de Cerdo', quantity: 3, unit: 'kg', price: 120.00 },
-      { productId: '5', name: 'Carne Molida', quantity: 1, unit: 'kg', price: 100.00 },
-    ],
-    total: 460.00,
+  items: [
+    {
+      product: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Product',
+        required: true
+      },
+      name: { type: String, required: true },
+      quantity: { type: Number, required: true, min: 1 },
+      unit: { type: String, default: 'kg' },
+      price: { type: Number, required: true }
+    }
+  ],
+  total: { type: Number, required: true },
+  pickupTime: { type: Date, required: true },
+  status: { 
+    type: String, 
+    enum: ['Pendiente', 'En preparación', 'Listo para retiro', 'Entregado', 'Cancelado'],
+    default: 'Pendiente'
   },
-];
+  delivery: { type: Boolean, default: false },
+  deliveryAddress: { type: String },
+}, {
+  timestamps: true // añade createdAt y updatedAt
+});
+
+export default mongoose.model('Order', orderSchema);

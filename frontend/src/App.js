@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import LayoutHeader from './components/LayoutHeader';
-import ProductList from './components/ProductList';
-import CartItem from './components/CartItem';
-import OrderSummary from './components/OrderSummary';
-import CustomerForm from './components/CustomerForm';
-import AdminOrderCard from './components/AdminOrderCard';
-import { products } from './mock/products';
-import { orders as initialOrders } from './mock/orders';
-import { createStorage, getStorage, setStorage } from './utils/storage';
+import LayoutHeader from './components/HeaderLayout.js';
+import ProductList from './components/ProductList.js';
+import CartItem from './components/CartItem.js';
+import OrderSummary from './components/OrderSummary.js';
+import CustomerForm from './components/CustomerForm.js';
+// Cambiamos AdminOrderCard por AdminOrderItem (nombre real del archivo)
+import AdminOrderCard from './components/AdminOrderItem.js';
+// Usamos utils para datos mock
+import { products } from './utils/products.js';
+import { orders as initialOrders } from './utils/orders.js';
+import { createStorage, getStorage, setStorage } from './utils/storage.js';
+
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState('home');
