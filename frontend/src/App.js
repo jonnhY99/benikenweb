@@ -4,18 +4,21 @@ import ProductList from './components/ProductList.js';
 import CartItem from './components/CartItem.js';
 import OrderSummary from './components/OrderSummary.js';
 import CustomerForm from './components/CustomerForm.js';
-// Cambiamos AdminOrderCard por AdminOrderItem (nombre real del archivo)
+import LoginForm from './components/LoginForm.js';
 import AdminOrderCard from './components/AdminOrderItem.js';
-// Usamos utils para datos mock
+import AdminLoginLogs from './components/AdminLoginLogs.js';
 import { products } from './utils/products.js';
 import { orders as initialOrders } from './utils/orders.js';
-import { createStorage, getStorage, setStorage } from './utils/storage.js';
-
+import { createStorage, setStorage } from './utils/storage.js';
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState('home');
   const [cart, setCart] = useState(() => createStorage('cart', []));
   const [allOrders, setAllOrders] = useState(() => createStorage('orders', initialOrders));
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem('user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
 
   useEffect(() => {
     setStorage('cart', cart);
@@ -25,6 +28,14 @@ const App = () => {
     setStorage('orders', allOrders);
   }, [allOrders]);
 
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    setUser(null);
+    setCurrentPage('home');
+  };
+
+  // Funciones para carrito y pedidos (igual que antes)
   const handleAddToCart = (product, quantity) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.productId === product.id);
@@ -42,21 +53,24 @@ const App = () => {
           alert(`Solo quedan ${product.stock} unidades de ${product.name}.`);
           return prevCart;
         }
-        return [...prevCart, {
-          productId: product.id,
-          name: product.name,
-          price: product.price,
-          unit: product.unit,
-          image: product.image,
-          quantity,
-        }];
+        return [
+          ...prevCart,
+          {
+            productId: product.id,
+            name: product.name,
+            price: product.price,
+            unit: product.unit,
+            image: product.image,
+            quantity,
+          },
+        ];
       }
     });
   };
 
   const handleUpdateCartQuantity = (productId, newQuantity) => {
     setCart((prevCart) => {
-      const productInStock = products.find(p => p.id === productId);
+      const productInStock = products.find((p) => p.id === productId);
       if (productInStock && newQuantity > productInStock.stock) {
         alert(`Solo quedan ${productInStock.stock} unidades de ${productInStock.name}.`);
         return prevCart;
@@ -91,9 +105,13 @@ const App = () => {
     };
 
     setAllOrders((prevOrders) => [...prevOrders, newOrder]);
-    setCart([]); // Clear cart after placing order
-    setCurrentPage('home'); // Navigate back to home or a confirmation page
-    alert(`¡Pedido #${newOrderId} realizado con éxito! Total: $${total.toFixed(2)}. Lo esperamos a las ${customerInfo.pickupTime}.`);
+    setCart([]);
+    setCurrentPage('home');
+    alert(
+      `¡Pedido #${newOrderId} realizado con éxito! Total: $${total.toFixed(
+        2
+      )}. Lo esperamos a las ${customerInfo.pickupTime}.`
+    );
   };
 
   const handleUpdateOrderStatus = (orderId, newStatus) => {
@@ -104,11 +122,19 @@ const App = () => {
     );
   };
 
-  const calculateCartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const calculateCartTotal = cart.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  );
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <LayoutHeader onNavigate={setCurrentPage} currentPage={currentPage} />
+      <LayoutHeader
+        onNavigate={setCurrentPage}
+        currentPage={currentPage}
+        user={user}
+        onLogout={handleLogout}
+      />
 
       <main className="container mx-auto p-6">
         {currentPage === 'home' && (
@@ -120,13 +146,27 @@ const App = () => {
           </section>
         )}
 
+        {currentPage === 'login' && (
+          <section>
+            <LoginForm
+              onLoginSuccess={(user) => {
+              setUser(user);
+              setCurrentPage('home');  // aquí se hace la redirección al inicio
+            }}
+            />
+          </section>
+        )}
+
+
         {currentPage === 'cart' && (
           <section>
             <h2 className="text-4xl font-extrabold text-gray-900 mb-8 text-center">
               Tu Carrito de Compras
             </h2>
             {cart.length === 0 ? (
-              <p className="text-center text-gray-600 text-xl">Tu carrito está vacío. ¡Agrega algo de carnita!</p>
+              <p className="text-center text-gray-600 text-xl">
+                Tu carrito está vacío. ¡Agrega algo de carnita!
+              </p>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-4">
@@ -156,7 +196,9 @@ const App = () => {
               Panel de Administración de Pedidos
             </h2>
             {allOrders.length === 0 ? (
-              <p className="text-center text-gray-600 text-xl">No hay pedidos registrados aún.</p>
+              <p className="text-center text-gray-600 text-xl">
+                No hay pedidos registrados aún.
+              </p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {allOrders.map((order) => (
@@ -168,6 +210,13 @@ const App = () => {
                 ))}
               </div>
             )}
+          </section>
+        )}
+
+        {/* Panel de logs solo para admin */}
+        {currentPage === 'logs' && user?.role === 'admin' && (
+          <section>
+            <AdminLoginLogs />
           </section>
         )}
       </main>
