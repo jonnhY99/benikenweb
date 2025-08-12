@@ -1,16 +1,19 @@
+// backend/models/Product.js
 import mongoose from 'mongoose';
 
-// Definimos el esquema del producto (estructura de campos)
-const productSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  description: { type: String, required: true },
-  price: { type: Number, required: true },
-  unit: { type: String, default: 'kg' },
-  image: { type: String },
-  stock: { type: Number, default: 0 }
-}, {
-  timestamps: true // añade createdAt y updatedAt automáticamente
-});
+const ProductSchema = new mongoose.Schema(
+  {
+    // Conservamos un "id" legible para que el frontend no tenga que cambiar
+    id: { type: String, required: true, unique: true }, // ej: "1", "2", "3"
+    name: { type: String, required: true },
+    description: { type: String, default: '' },
+    price: { type: Number, required: true },   // CLP por unidad
+    unit: { type: String, default: 'kg' },     // ej. 'kg'
+    image: { type: String, default: '' },      // ruta/URL
+    stock: { type: Number, default: 0 },       // stock disponible
+    isActive: { type: Boolean, default: true },// para ocultar sin borrar
+  },
+  { timestamps: true }
+);
 
-// Exportamos el modelo
-export default mongoose.model('Product', productSchema);
+export default mongoose.model('Product', ProductSchema);
