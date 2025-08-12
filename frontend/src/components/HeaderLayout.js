@@ -1,8 +1,10 @@
+// src/components/HeaderLayout.js
 import React, { useState } from 'react';
 
 const LayoutHeader = ({ onNavigate, currentPage, user, onLogout }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const isAdmin = user?.role === 'admin' /* || user?.role === 'carniceria' */;
+  const isAdmin = user?.role === 'admin';
+  const isButcher = user?.role === 'carniceria';
 
   const handleNavigate = (page) => {
     onNavigate(page);
@@ -58,7 +60,21 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout }) => {
               </button>
             </li>
 
-            {/* 🔐 Reportes solo para admin (o carniceria si habilitas arriba) */}
+            {/* 🧾 Pedidos (tablero de carnicería) visible a carnicería y admin */}
+            {(isButcher || isAdmin) && (
+              <li>
+                <button
+                  onClick={() => handleNavigate('carniceria')}
+                  className={`px-3 py-2 rounded-lg transition-colors ${
+                    currentPage === 'carniceria' ? 'bg-red-800' : 'hover:bg-red-600'
+                  }`}
+                >
+                  Pedidos
+                </button>
+              </li>
+            )}
+
+            {/* 📊 Reportes solo admin */}
             {isAdmin && (
               <li>
                 <button
@@ -72,7 +88,7 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout }) => {
               </li>
             )}
 
-            {/* Logs solo admin */}
+            {/* 🧰 Logs solo admin */}
             {isAdmin && (
               <li>
                 <button
@@ -111,7 +127,7 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout }) => {
         </nav>
       </div>
 
-      {/* Menú móvil (mismas opciones) */}
+      {/* Menú móvil */}
       <nav className={`md:hidden ${isMenuOpen ? 'block' : 'hidden'}`}>
         <ul className="mt-3 space-y-2">
           <li>
@@ -135,6 +151,19 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout }) => {
               Carrito
             </button>
           </li>
+
+          {(isButcher || isAdmin) && (
+            <li>
+              <button
+                onClick={() => handleNavigate('carniceria')}
+                className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                  currentPage === 'carniceria' ? 'bg-red-800' : 'hover:bg-red-600'
+                }`}
+              >
+                Pedidos
+              </button>
+            </li>
+          )}
 
           {isAdmin && (
             <li>

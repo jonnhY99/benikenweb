@@ -11,6 +11,7 @@ import { products } from './utils/products.js';
 import { orders as initialOrders } from './utils/orders.js';
 import { createStorage, setStorage } from './utils/storage.js';
 import AdminReports from './components/AdminReports'; // ← reportes
+import ButcherOrdersBoard from './components/ButcherOrdersBoard';
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState('home');
@@ -120,6 +121,7 @@ const App = () => {
   const calculateCartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   const isAdmin = user?.role === 'admin';
+  const isButcher = user?.role === 'carniceria';
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -181,6 +183,16 @@ const App = () => {
               </div>
             )}
           </section>
+        )}
+        {/* Panel Carnicería: tablero interactivo */}
+        {currentPage === 'carniceria' && (isButcher || isAdmin) && (
+        <ButcherOrdersBoard
+            orders={allOrders}
+            onUpdateStatus={handleUpdateOrderStatus}
+            />
+        )}
+        {currentPage === 'carniceria' && !(isButcher || isAdmin) && (
+          <p className="text-center text-red-600">No tienes permisos para ver esta sección.</p>
         )}
 
         {currentPage === 'admin' && (
