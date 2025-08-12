@@ -1,57 +1,56 @@
 import React, { useState } from 'react';
 
-const ProductCard = ({ product, onAddToCart }) => {
+const formatCLP = (value) => {
+  // 6298 => "$6.298"
+  return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
+};
+
+const ProductItem = ({ product, onAddToCart }) => {
   const [quantity, setQuantity] = useState(1);
 
-  const handleQuantityChange = (e) => {
-    const value = parseInt(e.target.value, 10);
-    if (value > 0 && value <= product.stock) {
-      setQuantity(value);
-    } else if (value > product.stock) {
-      setQuantity(product.stock);
-    } else {
-      setQuantity(1);
+  const handleAdd = () => {
+    if (quantity > 0) {
+      onAddToCart(product, quantity);
     }
   };
 
-  const handleAddToCart = () => {
-    onAddToCart(product, quantity);
-    setQuantity(1); // Reset quantity after adding to cart
-  };
-
   return (
-    <div className="bg-white rounded-lg shadow-lg overflow-hidden transform transition-transform hover:scale-105">
-      <img src={product.image} alt={product.name} className="w-full h-48 object-cover" />
-      <div className="p-4">
-        <h3 className="text-xl font-semibold text-gray-800 mb-2">{product.name}</h3>
-        <p className="text-gray-600 text-sm mb-3">{product.description}</p>
-        <div className="flex justify-between items-center mb-4">
-          <span className="text-2xl font-bold text-red-700">${product.price.toFixed(2)}/{product.unit}</span>
-          <span className="text-sm text-gray-500">Stock: {product.stock}</span>
-        </div>
-        <div className="flex items-center space-x-2 mb-4">
-          <label htmlFor={`quantity-${product.id}`} className="sr-only">Cantidad</label>
-          <input
-            type="number"
-            id={`quantity-${product.id}`}
-            value={quantity}
-            onChange={handleQuantityChange}
-            min="1"
-            max={product.stock}
-            className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-red-500"
-          />
-          <span className="text-gray-600">{product.unit}</span>
-        </div>
+    <div className="bg-white shadow-md rounded-lg p-6">
+      <img
+        src={product.image}
+        alt={product.name}
+        className="w-full h-48 object-cover rounded-md mb-4"
+        loading="lazy"
+        onError={(e) => { e.currentTarget.src = '/images/placeholder.png'; }}
+      />
+
+      <h3 className="text-xl font-semibold mb-1">{product.name}</h3>
+      <p className="text-gray-600 text-sm mb-2">{product.description}</p>
+
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-red-600 font-bold text-xl">
+          {formatCLP(product.price)}/{product.unit}
+        </span>
+        <span className="text-gray-500 text-sm">Stock: {product.stock}</span>
+      </div>
+
+      <div className="flex items-center space-x-3">
+        <input
+          type="number"
+          min="1"
+          value={quantity}
+          onChange={(e) => setQuantity(parseInt(e.target.value || '1', 10))}
+          className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-red-500"
+        />
         <button
-          onClick={handleAddToCart}
-          disabled={product.stock === 0}
-          className="w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={handleAdd}
+          className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors"
         >
-          {product.stock > 0 ? 'Agregar al Carrito' : 'Agotado'}
+          Agregar al Carrito
         </button>
       </div>
     </div>
   );
 };
 
-export default ProductCard;
+export default ProductItem;

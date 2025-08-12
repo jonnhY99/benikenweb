@@ -18,7 +18,7 @@ export const orders = [
     pickupTime: '02:00 PM',
     status: 'Completado',
     items: [
-      { productId: '3', name: 'Costillas de Cerdo', quantity: 3, unit: 'kg', price: 120.00 }
+      { productId: '3', name: 'Costillas de Cerdo', quantity: 3, unit: 'kg', price: 6.298 }
     ],
     total: 360.00,
   }

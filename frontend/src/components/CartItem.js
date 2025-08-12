@@ -1,5 +1,10 @@
 import React from 'react';
 
+const formatCLP = (value) => {
+  // value en pesos chilenos como entero: 6298 => "$6.298"
+  return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
+};
+
 const CartItem = ({ item, onUpdateQuantity, onRemoveItem }) => {
   const handleQuantityChange = (e) => {
     const newQuantity = parseInt(e.target.value, 10);
@@ -13,8 +18,12 @@ const CartItem = ({ item, onUpdateQuantity, onRemoveItem }) => {
       <img src={item.image} alt={item.name} className="w-20 h-20 object-cover rounded-md mr-4" />
       <div className="flex-grow">
         <h3 className="text-lg font-semibold text-gray-800">{item.name}</h3>
-        <p className="text-gray-600 text-sm">${item.price.toFixed(2)}/{item.unit}</p>
-        <p className="text-gray-700 font-bold mt-1">Subtotal: ${(item.price * item.quantity).toFixed(2)}</p>
+        <p className="text-gray-600 text-sm">
+          {formatCLP(item.price)}/{item.unit}
+        </p>
+        <p className="text-gray-700 font-bold mt-1">
+          Subtotal: {formatCLP(item.price * item.quantity)}
+        </p>
       </div>
       <div className="flex items-center space-x-2">
         <input
