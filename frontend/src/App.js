@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+// src/App.js
+import React, { useEffect, useRef, useState } from 'react';
+import { io } from 'socket.io-client';
+
 import LayoutHeader from './components/HeaderLayout.js';
 import ProductList from './components/ProductList.js';
 import CartItem from './components/CartItem.js';
@@ -7,23 +10,86 @@ import CustomerForm from './components/CustomerForm.js';
 import LoginForm from './components/LoginForm.js';
 import AdminOrderCard from './components/AdminOrderItem.js';
 import AdminLoginLogs from './components/AdminLoginLogs.js';
-import { products } from './utils/products.js';
-import { orders as initialOrders } from './utils/orders.js';
-import { createStorage, setStorage } from './utils/storage.js';
-import AdminReports from './components/AdminReports'; // ← reportes
+import AdminReports from './components/AdminReports';
 import ButcherOrdersBoard from './components/ButcherOrdersBoard';
+
+// YA NO importamos utils/products.js
+import { createStorage, setStorage } from './utils/storage.js';
+
+import {
+  fetchOrders,
+  createOrder,
+  updateOrderStatus,
+  deleteOrder,
+} from './api/orders';
+
+import { fetchProducts } from './api/products';
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState('home');
+
+  // Productos desde API
+  const [products, setProducts] = useState([]);
+
+  // Carrito (local)
   const [cart, setCart] = useState(() => createStorage('cart', []));
-  const [allOrders, setAllOrders] = useState(() => createStorage('orders', initialOrders));
+
+  // Pedidos desde API
+  const [allOrders, setAllOrders] = useState([]);
+
   const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem('user');
-    return savedUser ? JSON.parse(savedUser) : null;
+    try {
+      const savedUser = localStorage.getItem('user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
   });
 
-  useEffect(() => { setStorage('cart', cart); }, [cart]);
-  useEffect(() => { setStorage('orders', allOrders); }, [allOrders]);
+  useEffect(() => setStorage('cart', cart), [cart]);
+
+  const socketRef = useRef(null);
+
+  // Carga inicial + sockets
+  useEffect(() => {
+    // Productos
+    fetchProducts()
+      .then((list) => setProducts(list))
+      .catch((e) => console.error('fetchProducts error:', e));
+
+    // Pedidos
+    fetchOrders()
+      .then((orders) => setAllOrders(orders))
+      .catch((e) => console.error('fetchOrders error:', e));
+
+    const url = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    socketRef.current = io(url);
+
+    // Pedidos en tiempo real
+    socketRef.current.on('orders:created', (order) => {
+      setAllOrders((prev) => (prev.some((o) => o.id === order.id) ? prev : [order, ...prev]));
+    });
+    socketRef.current.on('orders:updated', (order) => {
+      setAllOrders((prev) => prev.map((o) => (o.id === order.id ? order : o)));
+    });
+    socketRef.current.on('orders:deleted', ({ id }) => {
+      setAllOrders((prev) => prev.filter((o) => o.id !== id));
+    });
+
+    // Productos en tiempo real (stock, etc.)
+    socketRef.current.on('products:updated', (updatedList) => {
+      setProducts((prev) => {
+        const map = new Map(prev.map((p) => [p.id, p]));
+        updatedList.forEach((u) => {
+          const prevP = map.get(u.id) || {};
+          map.set(u.id, { ...prevP, ...u });
+        });
+        return Array.from(map.values()).sort((a, b) => (a.id > b.id ? 1 : -1));
+      });
+    });
+
+    return () => socketRef.current?.disconnect();
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('authToken');
@@ -32,93 +98,108 @@ const App = () => {
     setCurrentPage('home');
   };
 
-  // Carrito
+  // ---- Carrito ----
   const handleAddToCart = (product, quantity) => {
     setCart((prevCart) => {
-      const existingItem = prevCart.find((item) => item.productId === product.id);
-      if (existingItem) {
-        const newQuantity = existingItem.quantity + quantity;
-        if (newQuantity > product.stock) {
-          alert(`Solo quedan ${product.stock} unidades de ${product.name}.`);
-          return prevCart;
-        }
-        return prevCart.map((item) =>
-          item.productId === product.id ? { ...item, quantity: newQuantity } : item
-        );
-      } else {
-        if (quantity > product.stock) {
-          alert(`Solo quedan ${product.stock} unidades de ${product.name}.`);
-          return prevCart;
-        }
-        return [
-          ...prevCart,
-          {
-            productId: product.id,
-            name: product.name,
-            price: product.price,
-            unit: product.unit,
-            image: product.image,
-            quantity,
-          },
-        ];
+      const existing = prevCart.find((i) => i.productId === product.id);
+      const newQty = (existing?.quantity || 0) + quantity;
+
+      if (newQty > product.stock) {
+        alert(`Solo quedan ${product.stock} unidades de ${product.name}.`);
+        return prevCart;
       }
+
+      if (existing) {
+        return prevCart.map((i) =>
+          i.productId === product.id ? { ...i, quantity: newQty } : i
+        );
+      }
+      return [
+        ...prevCart,
+        {
+          productId: product.id,
+          name: product.name,
+          price: product.price,
+          unit: product.unit || 'kg',
+          image: product.image,
+          quantity,
+        },
+      ];
     });
   };
 
   const handleUpdateCartQuantity = (productId, newQuantity) => {
-    setCart((prevCart) => {
-      const productInStock = products.find((p) => p.id === productId);
-      if (productInStock && newQuantity > productInStock.stock) {
-        alert(`Solo quedan ${productInStock.stock} unidades de ${productInStock.name}.`);
-        return prevCart;
-      }
-      return prevCart.map((item) =>
-        item.productId === productId ? { ...item, quantity: newQuantity } : item
-      );
-    });
+    const p = products.find((x) => x.id === productId);
+    if (p && newQuantity > p.stock) {
+      alert(`Solo quedan ${p.stock} unidades de ${p.name}.`);
+      return;
+    }
+    setCart((prevCart) =>
+      prevCart.map((i) => (i.productId === productId ? { ...i, quantity: newQuantity } : i))
+    );
   };
 
   const handleRemoveFromCart = (productId) => {
-    setCart((prevCart) => prevCart.filter((item) => item.productId !== productId));
+    setCart((prevCart) => prevCart.filter((i) => i.productId !== productId));
   };
 
-  const handlePlaceOrder = (customerInfo) => {
-    if (cart.length === 0) {
+  // Confirmar pedido: el backend valida stock y descuenta (bulkWrite)
+  const handlePlaceOrder = async (customerInfo) => {
+    if (!cart.length) {
       alert('El carrito está vacío. Agrega productos antes de confirmar el pedido.');
       return;
     }
-
-    const newOrderId = `ORD${String(allOrders.length + 1).padStart(3, '0')}`;
-    const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-
-    const newOrder = {
-      id: newOrderId,
-      customerName: customerInfo.name,
-      customerPhone: customerInfo.phone,
-      pickupTime: customerInfo.pickupTime,
-      status: 'Pendiente',
-      createdAt: new Date().toISOString(), // ← importante para reportes
-      items: cart,
-      total,
-    };
-
-    setAllOrders((prevOrders) => [...prevOrders, newOrder]);
-    setCart([]);
-    setCurrentPage('home');
-    alert(
-      `¡Pedido #${newOrderId} realizado con éxito! Total: $${total.toLocaleString('es-CL')}. Lo esperamos a las ${customerInfo.pickupTime}.`
-    );
+    try {
+      const totalCLP = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+      const payload = {
+        customerName: customerInfo.name,
+        customerPhone: customerInfo.phone,
+        pickupTime: customerInfo.pickupTime,
+        status: 'Pendiente',
+        totalCLP,
+        items: cart.map((i) => ({
+          productId: i.productId,
+          name: i.name,
+          quantity: i.quantity,
+          unit: i.unit || 'kg',
+          price: i.price,
+        })),
+      };
+      const created = await createOrder(payload);
+      alert(
+        `¡Pedido ${created.id} creado! Lo esperamos a las ${created.pickupTime}.`
+      );
+      setCart([]);
+      setCurrentPage('home');
+      // OJO: el stock se actualizará por socket 'products:updated'
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo crear el pedido (¿stock insuficiente?).');
+    }
   };
 
-  const handleUpdateOrderStatus = (orderId, newStatus) => {
-    setAllOrders((prevOrders) =>
-      prevOrders.map((order) =>
-        order.id === orderId ? { ...order, status: newStatus } : order
-      )
-    );
+  const handleUpdateOrderStatus = async (orderId, newStatus) => {
+    try {
+      await updateOrderStatus(orderId, newStatus);
+    } catch (err) {
+      console.error(err);
+      alert('Error al actualizar el estado del pedido');
+    }
   };
 
-  const calculateCartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const handleDeleteOrder = async (orderId) => {
+    const ok = window.confirm(`¿Eliminar el pedido ${orderId}? Esta acción no se puede deshacer.`);
+    if (!ok) return;
+    try {
+      await deleteOrder(orderId);
+      // El stock se repone por socket 'products:updated'
+    } catch (err) {
+      console.error(err);
+      alert('Error al eliminar el pedido');
+    }
+  };
+
+  const calculateCartTotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
 
   const isAdmin = user?.role === 'admin';
   const isButcher = user?.role === 'carniceria';
@@ -145,8 +226,8 @@ const App = () => {
         {currentPage === 'login' && (
           <section>
             <LoginForm
-              onLoginSuccess={(user) => {
-                setUser(user);
+              onLoginSuccess={(u) => {
+                setUser(u);
                 setCurrentPage('home');
               }}
             />
@@ -184,26 +265,28 @@ const App = () => {
             )}
           </section>
         )}
-        {/* Panel Carnicería: tablero interactivo */}
+
+        {/* Panel Carnicería + Admin */}
         {currentPage === 'carniceria' && (isButcher || isAdmin) && (
-        <ButcherOrdersBoard
+          <ButcherOrdersBoard
             orders={allOrders}
             onUpdateStatus={handleUpdateOrderStatus}
-            />
+            onDeleteOrder={handleDeleteOrder}
+            isAdmin={isAdmin}
+          />
         )}
         {currentPage === 'carniceria' && !(isButcher || isAdmin) && (
           <p className="text-center text-red-600">No tienes permisos para ver esta sección.</p>
         )}
 
+        {/* Panel Admin (cards) */}
         {currentPage === 'admin' && (
           <section>
             <h2 className="text-4xl font-extrabold text-gray-900 mb-8 text-center">
               Panel de Administración de Pedidos
             </h2>
             {allOrders.length === 0 ? (
-              <p className="text-center text-gray-600 text-xl">
-                No hay pedidos registrados aún.
-              </p>
+              <p className="text-center text-gray-600 text-xl">No hay pedidos registrados aún.</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {allOrders.map((order) => (
@@ -218,22 +301,10 @@ const App = () => {
           </section>
         )}
 
-        {/* Logs: solo admin */}
-        {currentPage === 'logs' && isAdmin && (
-          <section>
-            <AdminLoginLogs />
-          </section>
-        )}
+        {currentPage === 'logs' && isAdmin && <AdminLoginLogs />}
+        {currentPage === 'reportes' && isAdmin && <AdminReports />}
 
-        {/* Reportes: solo admin */}
-        {currentPage === 'reportes' && isAdmin && (
-          <section>
-            <AdminReports />
-          </section>
-        )}
-
-        {/* Intento de acceso a secciones admin sin permisos */}
-        {(['logs','reportes'].includes(currentPage)) && !isAdmin && (
+        {(['logs', 'reportes'].includes(currentPage)) && !isAdmin && (
           <p className="text-center text-red-600">No tienes permisos para ver esta sección.</p>
         )}
       </main>
