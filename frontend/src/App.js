@@ -10,6 +10,7 @@ import AdminLoginLogs from './components/AdminLoginLogs.js';
 import { products } from './utils/products.js';
 import { orders as initialOrders } from './utils/orders.js';
 import { createStorage, setStorage } from './utils/storage.js';
+import AdminReports from './components/AdminReports'; // ← reportes
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState('home');
@@ -20,13 +21,8 @@ const App = () => {
     return savedUser ? JSON.parse(savedUser) : null;
   });
 
-  useEffect(() => {
-    setStorage('cart', cart);
-  }, [cart]);
-
-  useEffect(() => {
-    setStorage('orders', allOrders);
-  }, [allOrders]);
+  useEffect(() => { setStorage('cart', cart); }, [cart]);
+  useEffect(() => { setStorage('orders', allOrders); }, [allOrders]);
 
   const handleLogout = () => {
     localStorage.removeItem('authToken');
@@ -35,7 +31,7 @@ const App = () => {
     setCurrentPage('home');
   };
 
-  // Funciones para carrito y pedidos (igual que antes)
+  // Carrito
   const handleAddToCart = (product, quantity) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.productId === product.id);
@@ -100,6 +96,7 @@ const App = () => {
       customerPhone: customerInfo.phone,
       pickupTime: customerInfo.pickupTime,
       status: 'Pendiente',
+      createdAt: new Date().toISOString(), // ← importante para reportes
       items: cart,
       total,
     };
@@ -108,9 +105,7 @@ const App = () => {
     setCart([]);
     setCurrentPage('home');
     alert(
-      `¡Pedido #${newOrderId} realizado con éxito! Total: $${total.toFixed(
-        2
-      )}. Lo esperamos a las ${customerInfo.pickupTime}.`
+      `¡Pedido #${newOrderId} realizado con éxito! Total: $${total.toLocaleString('es-CL')}. Lo esperamos a las ${customerInfo.pickupTime}.`
     );
   };
 
@@ -122,10 +117,9 @@ const App = () => {
     );
   };
 
-  const calculateCartTotal = cart.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  );
+  const calculateCartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+  const isAdmin = user?.role === 'admin';
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -150,13 +144,12 @@ const App = () => {
           <section>
             <LoginForm
               onLoginSuccess={(user) => {
-              setUser(user);
-              setCurrentPage('home');  // aquí se hace la redirección al inicio
-            }}
+                setUser(user);
+                setCurrentPage('home');
+              }}
             />
           </section>
         )}
-
 
         {currentPage === 'cart' && (
           <section>
@@ -213,11 +206,23 @@ const App = () => {
           </section>
         )}
 
-        {/* Panel de logs solo para admin */}
-        {currentPage === 'logs' && user?.role === 'admin' && (
+        {/* Logs: solo admin */}
+        {currentPage === 'logs' && isAdmin && (
           <section>
             <AdminLoginLogs />
           </section>
+        )}
+
+        {/* Reportes: solo admin */}
+        {currentPage === 'reportes' && isAdmin && (
+          <section>
+            <AdminReports />
+          </section>
+        )}
+
+        {/* Intento de acceso a secciones admin sin permisos */}
+        {(['logs','reportes'].includes(currentPage)) && !isAdmin && (
+          <p className="text-center text-red-600">No tienes permisos para ver esta sección.</p>
         )}
       </main>
     </div>
