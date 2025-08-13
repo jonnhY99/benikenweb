@@ -1,6 +1,5 @@
 // src/App.js
-import React, { useEffect, useRef, useState } from 'react';
-import { io } from 'socket.io-client';
+import React, { useEffect, useState } from 'react';
 
 import LayoutHeader from './components/HeaderLayout.js';
 import ProductList from './components/ProductList.js';
@@ -12,9 +11,10 @@ import AdminOrderCard from './components/AdminOrderItem.js';
 import AdminLoginLogs from './components/AdminLoginLogs.js';
 import AdminReports from './components/AdminReports';
 import ButcherOrdersBoard from './components/ButcherOrdersBoard';
+import OrderStatusPage from './components/OrderStatusPage.js';
 
-// YA NO importamos utils/products.js
 import { createStorage, setStorage } from './utils/storage.js';
+import { initSocket, getSocket, disconnectSocket } from './utils/socket';
 
 import {
   fetchOrders,
@@ -22,7 +22,6 @@ import {
   updateOrderStatus,
   deleteOrder,
 } from './api/orders';
-
 import { fetchProducts } from './api/products';
 
 const App = () => {
@@ -37,6 +36,7 @@ const App = () => {
   // Pedidos desde API
   const [allOrders, setAllOrders] = useState([]);
 
+  // Usuario autenticado (si aplica)
   const [user, setUser] = useState(() => {
     try {
       const savedUser = localStorage.getItem('user');
@@ -46,38 +46,40 @@ const App = () => {
     }
   });
 
+  // Tracking del pedido (persistido)
+  const [trackingOrderId, setTrackingOrderId] = useState(
+    () => localStorage.getItem('trackingOrderId') || ''
+  );
+  useEffect(() => {
+    if (trackingOrderId) {
+      localStorage.setItem('trackingOrderId', trackingOrderId);
+    } else {
+      localStorage.removeItem('trackingOrderId');
+    }
+  }, [trackingOrderId]);
+
   useEffect(() => setStorage('cart', cart), [cart]);
 
-  const socketRef = useRef(null);
-
-  // Carga inicial + sockets
+  // Carga inicial de datos
   useEffect(() => {
-    // Productos
-    fetchProducts()
-      .then((list) => setProducts(list))
-      .catch((e) => console.error('fetchProducts error:', e));
+    fetchProducts().then(setProducts).catch((e) => console.error('fetchProducts error:', e));
+    fetchOrders().then(setAllOrders).catch((e) => console.error('fetchOrders error:', e));
+  }, []);
 
-    // Pedidos
-    fetchOrders()
-      .then((orders) => setAllOrders(orders))
-      .catch((e) => console.error('fetchOrders error:', e));
+  // Socket: (re)conecta cuando cambia el usuario (para entrar a su "room")
+  useEffect(() => {
+    const userId = user?.id || null;
+    const s = initSocket(userId);
 
-    const url = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-    socketRef.current = io(url);
-
-    // Pedidos en tiempo real
-    socketRef.current.on('orders:created', (order) => {
+    // Suscripciones a eventos de negocio
+    const onOrderCreated = (order) =>
       setAllOrders((prev) => (prev.some((o) => o.id === order.id) ? prev : [order, ...prev]));
-    });
-    socketRef.current.on('orders:updated', (order) => {
+    const onOrderUpdated = (order) =>
       setAllOrders((prev) => prev.map((o) => (o.id === order.id ? order : o)));
-    });
-    socketRef.current.on('orders:deleted', ({ id }) => {
+    const onOrderDeleted = ({ id }) =>
       setAllOrders((prev) => prev.filter((o) => o.id !== id));
-    });
 
-    // Productos en tiempo real (stock, etc.)
-    socketRef.current.on('products:updated', (updatedList) => {
+    const onProductsUpdated = (updatedList) => {
       setProducts((prev) => {
         const map = new Map(prev.map((p) => [p.id, p]));
         updatedList.forEach((u) => {
@@ -86,16 +88,32 @@ const App = () => {
         });
         return Array.from(map.values()).sort((a, b) => (a.id > b.id ? 1 : -1));
       });
-    });
+    };
 
-    return () => socketRef.current?.disconnect();
-  }, []);
+    // Registrar listeners
+    s?.on('orders:created', onOrderCreated);
+    s?.on('orders:updated', onOrderUpdated);
+    s?.on('orders:deleted', onOrderDeleted);
+    s?.on('products:updated', onProductsUpdated);
+
+    // Cleanup al desmontar o cambiar de usuario
+    return () => {
+      const sock = getSocket();
+      sock?.off('orders:created', onOrderCreated);
+      sock?.off('orders:updated', onOrderUpdated);
+      sock?.off('orders:deleted', onOrderDeleted);
+      sock?.off('products:updated', onProductsUpdated);
+    };
+  }, [user?.id]);
 
   const handleLogout = () => {
-    localStorage.removeItem('authToken');
+    localStorage.removeItem('token');     // clave estándar
+    localStorage.removeItem('authToken'); // legacy
     localStorage.removeItem('user');
     setUser(null);
     setCurrentPage('home');
+    setTrackingOrderId('');
+    disconnectSocket();
   };
 
   // ---- Carrito ----
@@ -143,7 +161,7 @@ const App = () => {
     setCart((prevCart) => prevCart.filter((i) => i.productId !== productId));
   };
 
-  // Confirmar pedido: el backend valida stock y descuenta (bulkWrite)
+  // Confirmar pedido: el backend valida stock y descuenta (bulkWrite) y luego redirigimos a seguimiento
   const handlePlaceOrder = async (customerInfo) => {
     if (!cart.length) {
       alert('El carrito está vacío. Agrega productos antes de confirmar el pedido.');
@@ -165,13 +183,15 @@ const App = () => {
           price: i.price,
         })),
       };
+
       const created = await createOrder(payload);
-      alert(
-        `¡Pedido ${created.id} creado! Lo esperamos a las ${created.pickupTime}.`
-      );
+
+      // Guardar id para seguimiento y navegar a la vista de estado
+      setTrackingOrderId(created.id);
+      localStorage.setItem('trackingOrderId', created.id);
       setCart([]);
-      setCurrentPage('home');
-      // OJO: el stock se actualizará por socket 'products:updated'
+      setCurrentPage('orderStatus');
+      // El stock se actualizará por socket 'products:updated'
     } catch (err) {
       console.error(err);
       alert('No se pudo crear el pedido (¿stock insuficiente?).');
@@ -193,6 +213,11 @@ const App = () => {
     try {
       await deleteOrder(orderId);
       // El stock se repone por socket 'products:updated'
+      // Si eliminan justo el pedido en seguimiento, limpiamos y volvemos a home
+      if (orderId === trackingOrderId) {
+        setTrackingOrderId('');
+        setCurrentPage('home');
+      }
     } catch (err) {
       console.error(err);
       alert('Error al eliminar el pedido');
@@ -200,7 +225,6 @@ const App = () => {
   };
 
   const calculateCartTotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-
   const isAdmin = user?.role === 'admin';
   const isButcher = user?.role === 'carniceria';
 
@@ -211,9 +235,18 @@ const App = () => {
         currentPage={currentPage}
         user={user}
         onLogout={handleLogout}
+        trackingOrderId={trackingOrderId} // <-- para mostrar botón/aviso de seguimiento
       />
 
       <main className="container mx-auto p-6">
+        {/* --- Seguimiento del pedido --- */}
+        {currentPage === 'orderStatus' && (
+          <OrderStatusPage
+            orderId={trackingOrderId}
+            onGoHome={() => setCurrentPage('home')}
+          />
+        )}
+
         {currentPage === 'home' && (
           <section>
             <h2 className="text-4xl font-extrabold text-gray-900 mb-8 text-center">

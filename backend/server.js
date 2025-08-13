@@ -10,18 +10,19 @@ import ordersRouterFactory from './routes/orders.js';
 import productsRouterFactory from './routes/products.js';
 import authRouter from './routes/auth.js';
 import logsRouter from './routes/logs.js';
+import notificationsRouter from './routes/notifications.js';
 import { verifyToken, requireRole } from './middleware/auth.js';
 
 const app = express();
 const server = http.createServer(app);
 
-// Si usas proxy / Render / Nginx, permite leer IP real del cliente
+// Si usas proxy/Render/Nginx para poder ver la IP real
 app.set('trust proxy', true);
 
 // ===== CORS =====
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:3000')
   .split(',')
-  .map(s => s.trim());
+  .map((s) => s.trim());
 
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
@@ -31,21 +32,26 @@ app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
 // ===== Socket.IO =====
 const io = new Server(server, {
-  cors: {
-    origin: allowedOrigins,
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-  },
+  cors: { origin: allowedOrigins, methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'] },
+});
+
+// Cada socket se une a una "room" con el id de usuario (envíalo desde el frontend en handshake.auth.userId)
+io.on('connection', (socket) => {
+  const userId = socket.handshake.auth?.userId;
+  if (userId) socket.join(String(userId));
+  console.log('Socket conectado:', socket.id, 'room:', userId ?? '-');
+  socket.on('disconnect', () => console.log('Socket desconectado:', socket.id));
 });
 
 // ===== Rutas públicas =====
 app.use('/api/auth', authRouter);
 
-// ===== Rutas de negocio (factories que reciben io) =====
+// ===== Rutas de negocio (las factories reciben io) =====
 app.use('/api/products', productsRouterFactory(io));
 app.use('/api/orders', ordersRouterFactory(io));
 
-// Logs de sesión (solo ADMIN). Si quieres permitir carnicería también,
-// cambia requireRole('admin') por requireRole('admin','carniceria')
+// ===== Notificaciones y logs (protegidas) =====
+app.use('/api/notifications', verifyToken, notificationsRouter);
 app.use('/api/logs', verifyToken, requireRole('admin'), logsRouter);
 
 // ===== Conexión a Mongo + arranque =====
@@ -61,12 +67,6 @@ mongoose
   .connect(MONGODB_URI, { serverSelectionTimeoutMS: 8000, autoIndex: true })
   .then(() => {
     console.log('✅ MongoDB conectado');
-
-    io.on('connection', (socket) => {
-      console.log('Socket conectado:', socket.id);
-      socket.on('disconnect', () => console.log('Socket desconectado:', socket.id));
-    });
-
     server.listen(PORT, () => {
       console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
       console.log(`🔗 CORS permitido: ${allowedOrigins.join(', ')}`);
@@ -77,10 +77,6 @@ mongoose
     process.exit(1);
   });
 
-// (Opcional) Manejo de errores no controlados para evitar cierres silenciosos
-process.on('unhandledRejection', (reason) => {
-  console.error('🔴 Unhandled Rejection:', reason);
-});
-process.on('uncaughtException', (err) => {
-  console.error('🔴 Uncaught Exception:', err);
-});
+// (Opcional) Mejor manejo de errores no controlados
+process.on('unhandledRejection', (reason) => console.error('🔴 Unhandled Rejection:', reason));
+process.on('uncaughtException', (err) => console.error('🔴 Uncaught Exception:', err));

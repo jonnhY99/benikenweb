@@ -1,7 +1,7 @@
 // src/components/HeaderLayout.js
 import React, { useState } from 'react';
 
-const LayoutHeader = ({ onNavigate, currentPage, user, onLogout }) => {
+const LayoutHeader = ({ onNavigate, currentPage, user, onLogout, trackingOrderId }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isAdmin = user?.role === 'admin';
   const isButcher = user?.role === 'carniceria';
@@ -11,9 +11,11 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout }) => {
     setIsMenuOpen(false); // cierra menú móvil al navegar
   };
 
+  const showTrackingBanner = trackingOrderId && currentPage !== 'orderStatus';
+
   return (
-    <header className="bg-red-700 text-white p-4 shadow-md">
-      <div className="container mx-auto flex justify-between items-center">
+    <header className="bg-red-700 text-white shadow-md">
+      <div className="container mx-auto px-4 py-4 flex justify-between items-center">
         <h1
           className="text-3xl font-bold cursor-pointer"
           onClick={() => handleNavigate('home')}
@@ -37,7 +39,22 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout }) => {
 
         {/* Menú desktop */}
         <nav className="hidden md:block">
-          <ul className="flex space-x-4">
+          <ul className="flex space-x-3">
+            {/* Seguimiento visible si hay pedido en curso */}
+            {trackingOrderId && (
+              <li>
+                <button
+                  onClick={() => handleNavigate('orderStatus')}
+                  className={`px-3 py-2 rounded-lg transition-colors ${
+                    currentPage === 'orderStatus' ? 'bg-yellow-500 text-black' : 'bg-yellow-300 text-black hover:bg-yellow-400'
+                  }`}
+                  title={`Ver seguimiento pedido ${trackingOrderId}`}
+                >
+                  Seguimiento
+                </button>
+              </li>
+            )}
+
             <li>
               <button
                 onClick={() => handleNavigate('home')}
@@ -60,7 +77,6 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout }) => {
               </button>
             </li>
 
-            {/* 🧾 Pedidos (tablero de carnicería) visible a carnicería y admin */}
             {(isButcher || isAdmin) && (
               <li>
                 <button
@@ -74,32 +90,29 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout }) => {
               </li>
             )}
 
-            {/* 📊 Reportes solo admin */}
             {isAdmin && (
-              <li>
-                <button
-                  onClick={() => handleNavigate('reportes')}
-                  className={`px-3 py-2 rounded-lg transition-colors ${
-                    currentPage === 'reportes' ? 'bg-red-800' : 'hover:bg-red-600'
-                  }`}
-                >
-                  Reportes
-                </button>
-              </li>
-            )}
-
-            {/* 🧰 Logs solo admin */}
-            {isAdmin && (
-              <li>
-                <button
-                  onClick={() => handleNavigate('logs')}
-                  className={`px-3 py-2 rounded-lg transition-colors ${
-                    currentPage === 'logs' ? 'bg-red-800' : 'hover:bg-red-600'
-                  }`}
-                >
-                  Logs de Sesión
-                </button>
-              </li>
+              <>
+                <li>
+                  <button
+                    onClick={() => handleNavigate('reportes')}
+                    className={`px-3 py-2 rounded-lg transition-colors ${
+                      currentPage === 'reportes' ? 'bg-red-800' : 'hover:bg-red-600'
+                    }`}
+                  >
+                    Reportes
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => handleNavigate('logs')}
+                    className={`px-3 py-2 rounded-lg transition-colors ${
+                      currentPage === 'logs' ? 'bg-red-800' : 'hover:bg-red-600'
+                    }`}
+                  >
+                    Logs de Sesión
+                  </button>
+                </li>
+              </>
             )}
 
             {!user ? (
@@ -127,9 +140,41 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout }) => {
         </nav>
       </div>
 
+      {/* Banner guía si hay pedido en curso y no estamos en la pantalla de seguimiento */}
+      {showTrackingBanner && (
+        <div className="bg-yellow-100 text-yellow-900">
+          <div className="container mx-auto px-4 py-2 flex flex-wrap items-center justify-between gap-3">
+            <span>
+              Tienes un pedido en preparación: <b>{trackingOrderId}</b>
+            </span>
+            <button
+              onClick={() => handleNavigate('orderStatus')}
+              className="px-3 py-1 rounded bg-yellow-400 text-black hover:bg-yellow-500"
+            >
+              Ver seguimiento
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Menú móvil */}
-      <nav className={`md:hidden ${isMenuOpen ? 'block' : 'hidden'}`}>
+      <nav className={`md:hidden ${isMenuOpen ? 'block' : 'hidden'} px-4 pb-4`}>
         <ul className="mt-3 space-y-2">
+          {trackingOrderId && (
+            <li>
+              <button
+                onClick={() => handleNavigate('orderStatus')}
+                className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                  currentPage === 'orderStatus'
+                    ? 'bg-yellow-500 text-black'
+                    : 'bg-yellow-300 text-black hover:bg-yellow-400'
+                }`}
+              >
+                Seguimiento
+              </button>
+            </li>
+          )}
+
           <li>
             <button
               onClick={() => handleNavigate('home')}
@@ -166,29 +211,28 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout }) => {
           )}
 
           {isAdmin && (
-            <li>
-              <button
-                onClick={() => handleNavigate('reportes')}
-                className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                  currentPage === 'reportes' ? 'bg-red-800' : 'hover:bg-red-600'
-                }`}
-              >
-                Reportes
-              </button>
-            </li>
-          )}
-
-          {isAdmin && (
-            <li>
-              <button
-                onClick={() => handleNavigate('logs')}
-                className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                  currentPage === 'logs' ? 'bg-red-800' : 'hover:bg-red-600'
-                }`}
-              >
-                Logs de Sesión
-              </button>
-            </li>
+            <>
+              <li>
+                <button
+                  onClick={() => handleNavigate('reportes')}
+                  className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                    currentPage === 'reportes' ? 'bg-red-800' : 'hover:bg-red-600'
+                  }`}
+                >
+                  Reportes
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => handleNavigate('logs')}
+                  className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                    currentPage === 'logs' ? 'bg-red-800' : 'hover:bg-red-600'
+                  }`}
+                >
+                  Logs de Sesión
+                </button>
+              </li>
+            </>
           )}
 
           {!user ? (
