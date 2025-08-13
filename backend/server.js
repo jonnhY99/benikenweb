@@ -8,43 +8,55 @@ import { Server } from 'socket.io';
 
 import ordersRouterFactory from './routes/orders.js';
 import productsRouterFactory from './routes/products.js';
-import authRouter from './routes/auth.js'; // <-- login simple
+import authRouter from './routes/auth.js';
+import logsRouter from './routes/logs.js';
+import { verifyToken, requireRole } from './middleware/auth.js';
 
 const app = express();
 const server = http.createServer(app);
 
-// === Orígenes permitidos (separados por coma en CLIENT_URL)
+// Si usas proxy / Render / Nginx, permite leer IP real del cliente
+app.set('trust proxy', true);
+
+// ===== CORS =====
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:3000')
   .split(',')
   .map(s => s.trim());
 
-// ---- Middlewares PRIMERO (antes de rutas)
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 
-// Healthcheck útil
+// ===== Healthcheck =====
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
-// ---- Socket.IO
+// ===== Socket.IO =====
 const io = new Server(server, {
-  cors: { origin: allowedOrigins, methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'] },
+  cors: {
+    origin: allowedOrigins,
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  },
 });
 
-// ---- Rutas (después de middlewares, una sola vez)
+// ===== Rutas públicas =====
 app.use('/api/auth', authRouter);
+
+// ===== Rutas de negocio (factories que reciben io) =====
 app.use('/api/products', productsRouterFactory(io));
 app.use('/api/orders', ordersRouterFactory(io));
 
-// ---- Validación .env
+// Logs de sesión (solo ADMIN). Si quieres permitir carnicería también,
+// cambia requireRole('admin') por requireRole('admin','carniceria')
+app.use('/api/logs', verifyToken, requireRole('admin'), logsRouter);
+
+// ===== Conexión a Mongo + arranque =====
 const MONGODB_URI = process.env.MONGODB_URI;
 const PORT = process.env.PORT || 5000;
 
 if (!MONGODB_URI) {
-  console.error('❌ FALTA MONGODB_URI en backend/.env');
+  console.error('❌ Falta MONGODB_URI en backend/.env');
   process.exit(1);
 }
 
-// ---- Conexión a Mongo + arranque
 mongoose
   .connect(MONGODB_URI, { serverSelectionTimeoutMS: 8000, autoIndex: true })
   .then(() => {
@@ -64,3 +76,11 @@ mongoose
     console.error('❌ Error conectando a MongoDB:', err?.message || err);
     process.exit(1);
   });
+
+// (Opcional) Manejo de errores no controlados para evitar cierres silenciosos
+process.on('unhandledRejection', (reason) => {
+  console.error('🔴 Unhandled Rejection:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('🔴 Uncaught Exception:', err);
+});

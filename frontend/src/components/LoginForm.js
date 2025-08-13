@@ -1,41 +1,39 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import { apiFetch } from '../utils/api'; // usa el helper que adjunta el Bearer token
 
 const LoginForm = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    setLoading(true);
+
     try {
-      // Llamada al backend para autenticar
-      const res = await axios.post('http://localhost:5000/api/users/login', {
-        email,
-        password,
+      // Llamada al backend (devuelve { token, user })
+      const { token, user } = await apiFetch('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
       });
 
-      // Verificar que el backend devolvió token y usuario
-      if (!res.data || !res.data.token || !res.data.user) {
-        throw new Error('Respuesta inválida del servidor');
-      }
-
-      const { token, user } = res.data;
-
-      // Guardar token y datos de usuario en localStorage
-      localStorage.setItem('authToken', token);
+      // Guarda en localStorage con claves consistentes
+      localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
 
-      // Limpiar errores previos y redirigir al home
-      setError('');
-      onLoginSuccess(user);
-    } catch (err) {
-      // Manejo de error más detallado
-      if (err.response && err.response.data?.message) {
-        setError(err.response.data.message); // usa mensaje del backend si existe
+      // Notifica éxito al padre (si no viene, recarga o navega al home)
+      if (typeof onLoginSuccess === 'function') {
+        onLoginSuccess(user);
       } else {
-        setError('Correo o contraseña inválidos');
+        window.location.href = '/';
       }
+    } catch (err) {
+      // apiFetch lanza Error(msg) con el mensaje del backend si existe
+      setError(err.message || 'Correo o contraseña inválidos');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -43,6 +41,7 @@ const LoginForm = ({ onLoginSuccess }) => {
     <div className="max-w-md mx-auto mt-10 bg-white shadow-lg rounded-lg p-6">
       <h2 className="text-2xl font-bold mb-4 text-center">Iniciar Sesión</h2>
       {error && <p className="text-red-600 text-center mb-2">{error}</p>}
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-gray-700">Correo</label>
@@ -51,10 +50,12 @@ const LoginForm = ({ onLoginSuccess }) => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full p-2 border border-gray-300 rounded"
-            placeholder="tuemail@ejemplo.com"
+            placeholder="tuemail@beniken.com"
+            autoComplete="username"
             required
           />
         </div>
+
         <div>
           <label className="block text-gray-700">Contraseña</label>
           <input
@@ -63,14 +64,19 @@ const LoginForm = ({ onLoginSuccess }) => {
             onChange={(e) => setPassword(e.target.value)}
             className="w-full p-2 border border-gray-300 rounded"
             placeholder="********"
+            autoComplete="current-password"
             required
           />
         </div>
+
         <button
           type="submit"
-          className="w-full bg-red-700 text-white p-2 rounded hover:bg-red-800 transition-colors"
+          disabled={loading}
+          className={`w-full p-2 rounded text-white transition-colors ${
+            loading ? 'bg-red-400 cursor-not-allowed' : 'bg-red-700 hover:bg-red-800'
+          }`}
         >
-          Entrar
+          {loading ? 'Ingresando...' : 'Entrar'}
         </button>
       </form>
     </div>
