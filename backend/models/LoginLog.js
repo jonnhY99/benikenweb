@@ -1,18 +1,21 @@
 // backend/models/LoginLog.js
 import mongoose from 'mongoose';
 
-const LoginLogSchema = new mongoose.Schema(
+const loginLogSchema = new mongoose.Schema(
   {
-    userId:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    name:     { type: String, required: true },
-    email:    { type: String, required: true },
-    role:     { type: String, enum: ['admin', 'carniceria', 'cliente'], required: true },
-    ip:       { type: String },
-    userAgent:{ type: String },
+    name:   { type: String, required: true },
+    email:  { type: String, required: true },
+    role:   { type: String, required: true },
+    ip:     { type: String, default: '-' },
+    userAgent: { type: String, default: '-' },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
-  { timestamps: true }
+  { timestamps: true } // createdAt / updatedAt automáticos
 );
 
-LoginLogSchema.index({ createdAt: -1 });
+// índices para búsquedas rápidas
+loginLogSchema.index({ createdAt: -1 });
+loginLogSchema.index({ email: 1 });
+loginLogSchema.index({ role: 1 });
 
-export default mongoose.model('LoginLog', LoginLogSchema);
+export default mongoose.model('LoginLog', loginLogSchema);

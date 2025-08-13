@@ -32,19 +32,21 @@ router.post('/login', async (req, res) => {
       name: user.name,
     });
 
-    // Registrar Log de inicio de sesión (no detiene el login si falla)
-    try {
-      await LoginLog.create({
-        userName: user.name,
-        email: user.email,
-        role: user.role,
-        ip: req.ip,
-        userAgent: req.headers['user-agent'] || '',
-        createdAt: new Date(),
-      });
-    } catch (e) {
-      console.warn('No se pudo guardar login log:', e.message || e);
-    }
+  // Registrar Log de inicio de sesión (no detiene el login si falla)
+try {
+  await LoginLog.create({
+    name: user.name,               // <-- antes decía userName
+    email: user.email,
+    role: user.role,
+    ip: req.ip,
+    userAgent: req.headers['user-agent'] || '',
+    createdAt: new Date(),
+    userId: user._id,              // opcional, útil para trazabilidad
+  });
+} catch (e) {
+  console.warn('No se pudo guardar login log:', e.message || e);
+}
+
 
     const safeUser = { id: user._id, name: user.name, email: user.email, role: user.role };
     return res.json({ token, user: safeUser });

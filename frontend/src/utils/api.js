@@ -1,25 +1,41 @@
 // frontend/src/utils/api.js
-export const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-export async function apiFetch(path, options = {}) {
-  const token = localStorage.getItem('token');
+/** Obtiene el token desde localStorage (soporta "token" y "authToken") */
+export function getToken() {
+  return (
+    localStorage.getItem('token') ||
+    localStorage.getItem('authToken') || // compatibilidad con versiones previas
+    ''
+  );
+}
 
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(options.headers || {}),
-  };
-  if (token) headers.Authorization = `Bearer ${token}`;
+/** Helper para llamadas autenticadas */
+export async function apiFetch(path, { method = 'GET', body, headers = {}, token } = {}) {
+  const t = token ?? getToken();
+  if (!t) throw new Error('Token requerido');
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${t}`,
+      ...headers,
+    },
+    body,
+  });
+
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    data = null;
+  }
 
   if (!res.ok) {
-    let data;
-    try { data = await res.json(); } catch (_) {}
-    const msg = data?.error || data?.message || `Error ${res.status}`;
+    const msg = (data && (data.message || data.error)) || `HTTP ${res.status}`;
     throw new Error(msg);
   }
 
-  return res.json();
+  return data;
 }
-
-export default apiFetch;
