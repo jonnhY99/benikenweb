@@ -6,6 +6,7 @@ import Product from '../models/Product.js';
 export default function ordersRouterFactory(io) {
   const router = express.Router();
 
+  // Generar el próximo id de pedido (ORD001, ORD002, etc.)
   async function getNextOrderId() {
     const last = await Order.find().sort({ createdAt: -1 }).limit(1);
     let next = 1;
@@ -16,13 +17,18 @@ export default function ordersRouterFactory(io) {
     return `ORD${String(next).padStart(3, '0')}`;
   }
 
-  // GET todos (admin/carnicería usan este)
+  // 📌 GET todos (admin/carnicería usan este)
   router.get('/', async (_req, res) => {
-    const orders = await Order.find().sort({ createdAt: -1 });
-    res.json(orders);
+    try {
+      const orders = await Order.find().sort({ createdAt: -1 });
+      res.json(orders);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Error al obtener pedidos' });
+    }
   });
 
-  // GET por id (público, para tracking)
+  // 📌 GET por id (público, para tracking)
   router.get('/:id', async (req, res) => {
     try {
       const q = req.params.id;
@@ -38,36 +44,58 @@ export default function ordersRouterFactory(io) {
     }
   });
 
-  // Crear pedido (descuenta stock)
+  // 📌 Crear pedido (descuenta stock)
   router.post('/', async (req, res) => {
     try {
-      const payload = req.body || {};
-      if (!payload.items?.length) {
+      const {
+        customerName,
+        customerPhone,
+        customerEmail,
+        note = '',
+        pickupTime,
+        status = 'Pendiente',
+        totalCLP,
+        items
+      } = req.body;
+
+      if (!items?.length) {
         return res.status(400).json({ error: 'El pedido no contiene ítems' });
       }
-      if (!payload.id) payload.id = await getNextOrderId();
+
+      // Generar ID si no viene
+      const id = req.body.id || await getNextOrderId();
 
       // Descontar stock
-      const ops = payload.items.map((it) => ({
+      const ops = items.map((it) => ({
         updateOne: {
           filter: { id: it.productId, stock: { $gte: it.quantity } },
           update: { $inc: { stock: -it.quantity } },
         },
       }));
+
       const bulk = await Product.bulkWrite(ops, { ordered: true });
       const modified = bulk.modifiedCount ?? bulk.nModified ?? 0;
-      if (modified !== payload.items.length) {
+      if (modified !== items.length) {
         return res.status(409).json({ error: 'Stock insuficiente en uno o más productos' });
       }
 
-      const order = await Order.create(payload);
+      // Crear pedido
+      const order = await Order.create({
+        id,
+        customerName,
+        customerPhone,
+        customerEmail,
+        note,
+        pickupTime,
+        status,
+        totalCLP,
+        items
+      });
 
-      // Notificar stock actualizado
-      const ids = payload.items.map((i) => i.productId);
+      // Emitir eventos en tiempo real
+      const ids = items.map((i) => i.productId);
       const updatedProducts = await Product.find({ id: { $in: ids } });
       io.emit('products:updated', updatedProducts);
-
-      // Notificar pedido creado
       io.emit('orders:created', order);
 
       res.status(201).json(order);
@@ -77,16 +105,19 @@ export default function ordersRouterFactory(io) {
     }
   });
 
-  // Actualizar estado
+  // 📌 Actualizar estado (compatible con id y _id)
   router.patch('/:id/status', async (req, res) => {
     try {
       const { status } = req.body;
-      const order = await Order.findOneAndUpdate(
-        { id: req.params.id },
-        { status },
-        { new: true }
-      );
-      if (!order) return res.sendStatus(404);
+      const q = req.params.id;
+
+      let order = await Order.findOneAndUpdate({ id: q }, { status }, { new: true });
+      if (!order && q.match(/^[0-9a-fA-F]{24}$/)) {
+        order = await Order.findByIdAndUpdate(q, { status }, { new: true });
+      }
+
+      if (!order) return res.status(404).json({ error: 'Pedido no encontrado' });
+
       io.emit('orders:updated', order);
       res.json(order);
     } catch (err) {
@@ -95,12 +126,18 @@ export default function ordersRouterFactory(io) {
     }
   });
 
-  // Eliminar pedido (repone stock)
+  // 📌 Eliminar pedido (repone stock)
   router.delete('/:id', async (req, res) => {
     try {
-      const order = await Order.findOneAndDelete({ id: req.params.id });
-      if (!order) return res.sendStatus(404);
+      const q = req.params.id;
+      let order = await Order.findOneAndDelete({ id: q });
+      if (!order && q.match(/^[0-9a-fA-F]{24}$/)) {
+        order = await Order.findByIdAndDelete(q);
+      }
 
+      if (!order) return res.status(404).json({ error: 'Pedido no encontrado' });
+
+      // Reponer stock si había productos
       if (order.items?.length) {
         const ops = order.items.map((it) => ({
           updateOne: {
@@ -115,7 +152,7 @@ export default function ordersRouterFactory(io) {
         io.emit('products:updated', updatedProducts);
       }
 
-      io.emit('orders:deleted', { id: req.params.id });
+      io.emit('orders:deleted', { id: q });
       res.sendStatus(204);
     } catch (err) {
       console.error(err);

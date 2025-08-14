@@ -1,59 +1,38 @@
+import 'dotenv/config';
 import mongoose from 'mongoose';
-import dotenv from 'dotenv';
-import User from './models/User.js';
-
-dotenv.config();
+import User from '../models/User.js';
 
 const users = [
-  {
-    name: 'Administrador',
-    email: 'admin@beniken.com',
-    password: 'admin123',      // se cifrará automáticamente
-    role: 'admin'
-  },
-  {
-    name: 'Carnicería Local',
-    email: 'carniceria@beniken.com',
-    password: 'carniceria123', // se cifrará automáticamente
-    role: 'carniceria'
-  },
-  {
-    name: 'Cliente Juan',
-    email: 'juan@beniken.com',
-    password: 'juan123',       // se cifrará automáticamente
-    role: 'cliente'
-  }
+  { name: 'Administrador', email: 'admin@beniken.com', password: 'admin123', role: 'admin' },
+  { name: 'Carnicería Local', email: 'carniceria@beniken.com', password: 'carne123', role: 'carniceria' },
+  { name: 'Cliente Axel', email: 'axel@beniken.com', password: 'axel123', role: 'cliente' }
 ];
 
-const seedUsers = async () => {
+(async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log('Conectado a MongoDB');
+    await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 8000 });
+    console.log('✅ Conectado a MongoDB');
 
-    // Eliminar usuarios previos
     await User.deleteMany();
-    console.log('Usuarios anteriores eliminados');
+    console.log('🗑 Usuarios anteriores eliminados');
 
-    // Insertar uno por uno para que el hook pre('save') cifre las contraseñas
     const createdUsers = [];
     for (const data of users) {
       const user = new User(data);
-      const savedUser = await user.save();
+      const savedUser = await user.save(); // ejecuta el pre('save')
       createdUsers.push({
         id: savedUser._id,
         email: savedUser.email,
         role: savedUser.role,
-        passwordHashed: savedUser.password.startsWith('$2b$') // verifica si se cifró
+        passwordHashed: savedUser.password.startsWith('$2b$')
       });
     }
 
-    console.log('Usuarios creados:', createdUsers);
-    console.log(`${createdUsers.length} usuarios insertados con contraseñas cifradas`);
-    mongoose.connection.close();
-  } catch (error) {
-    console.error('Error al poblar usuarios:', error);
-    mongoose.connection.close();
+    console.log('✅ Usuarios creados:', createdUsers);
+  } catch (err) {
+    console.error('❌ Error al poblar usuarios:', err.message);
+  } finally {
+    await mongoose.disconnect();
+    console.log('🔌 Desconectado de MongoDB');
   }
-};
-
-seedUsers();
+})();

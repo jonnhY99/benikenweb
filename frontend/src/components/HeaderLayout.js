@@ -1,29 +1,31 @@
 // src/components/HeaderLayout.js
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
-const LayoutHeader = ({ onNavigate, currentPage, user, onLogout, trackingOrderId }) => {
+const LayoutHeader = ({ user, onLogout, trackingOrderId }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isAdmin = user?.role === 'admin';
   const isButcher = user?.role === 'carniceria';
+  const navigate = useNavigate();
 
-  const handleNavigate = (page) => {
-    onNavigate(page);
-    setIsMenuOpen(false); // cierra menú móvil al navegar
+  const handleNavigate = (path) => {
+    navigate(path);
+    setIsMenuOpen(false); // cerrar menú móvil al navegar
   };
 
-  const showTrackingBanner = trackingOrderId && currentPage !== 'orderStatus';
+  const showTrackingBanner = trackingOrderId;
 
   return (
     <header className="bg-red-700 text-white shadow-md">
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
         <h1
           className="text-3xl font-bold cursor-pointer"
-          onClick={() => handleNavigate('home')}
+          onClick={() => handleNavigate('/')}
         >
           Carnes Beniken
         </h1>
 
-        {/* Toggle menú móvil */}
+        {/* Botón menú móvil */}
         <div className="md:hidden">
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -40,15 +42,11 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout, trackingOrderId
         {/* Menú desktop */}
         <nav className="hidden md:block">
           <ul className="flex space-x-3">
-            {/* Seguimiento visible si hay pedido en curso */}
             {trackingOrderId && (
               <li>
                 <button
-                  onClick={() => handleNavigate('orderStatus')}
-                  className={`px-3 py-2 rounded-lg transition-colors ${
-                    currentPage === 'orderStatus' ? 'bg-yellow-500 text-black' : 'bg-yellow-300 text-black hover:bg-yellow-400'
-                  }`}
-                  title={`Ver seguimiento pedido ${trackingOrderId}`}
+                  onClick={() => handleNavigate('/order-status')}
+                  className="px-3 py-2 rounded-lg bg-yellow-300 text-black hover:bg-yellow-400"
                 >
                   Seguimiento
                 </button>
@@ -57,10 +55,8 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout, trackingOrderId
 
             <li>
               <button
-                onClick={() => handleNavigate('home')}
-                className={`px-3 py-2 rounded-lg transition-colors ${
-                  currentPage === 'home' ? 'bg-red-800' : 'hover:bg-red-600'
-                }`}
+                onClick={() => handleNavigate('/')}
+                className="px-3 py-2 rounded-lg hover:bg-red-600"
               >
                 Inicio
               </button>
@@ -68,10 +64,8 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout, trackingOrderId
 
             <li>
               <button
-                onClick={() => handleNavigate('cart')}
-                className={`px-3 py-2 rounded-lg transition-colors ${
-                  currentPage === 'cart' ? 'bg-red-800' : 'hover:bg-red-600'
-                }`}
+                onClick={() => handleNavigate('/cart')}
+                className="px-3 py-2 rounded-lg hover:bg-red-600"
               >
                 Carrito
               </button>
@@ -80,10 +74,8 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout, trackingOrderId
             {(isButcher || isAdmin) && (
               <li>
                 <button
-                  onClick={() => handleNavigate('carniceria')}
-                  className={`px-3 py-2 rounded-lg transition-colors ${
-                    currentPage === 'carniceria' ? 'bg-red-800' : 'hover:bg-red-600'
-                  }`}
+                  onClick={() => handleNavigate('/carniceria')}
+                  className="px-3 py-2 rounded-lg hover:bg-red-600"
                 >
                   Pedidos
                 </button>
@@ -94,20 +86,16 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout, trackingOrderId
               <>
                 <li>
                   <button
-                    onClick={() => handleNavigate('reportes')}
-                    className={`px-3 py-2 rounded-lg transition-colors ${
-                      currentPage === 'reportes' ? 'bg-red-800' : 'hover:bg-red-600'
-                    }`}
+                    onClick={() => handleNavigate('/reportes')}
+                    className="px-3 py-2 rounded-lg hover:bg-red-600"
                   >
                     Reportes
                   </button>
                 </li>
                 <li>
                   <button
-                    onClick={() => handleNavigate('logs')}
-                    className={`px-3 py-2 rounded-lg transition-colors ${
-                      currentPage === 'logs' ? 'bg-red-800' : 'hover:bg-red-600'
-                    }`}
+                    onClick={() => handleNavigate('/logs')}
+                    className="px-3 py-2 rounded-lg hover:bg-red-600"
                   >
                     Logs de Sesión
                   </button>
@@ -118,10 +106,8 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout, trackingOrderId
             {!user ? (
               <li>
                 <button
-                  onClick={() => handleNavigate('login')}
-                  className={`px-3 py-2 rounded-lg transition-colors ${
-                    currentPage === 'login' ? 'bg-red-800' : 'hover:bg-red-600'
-                  }`}
+                  onClick={() => handleNavigate('/login')}
+                  className="px-3 py-2 rounded-lg hover:bg-red-600"
                 >
                   Iniciar Sesión
                 </button>
@@ -140,7 +126,7 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout, trackingOrderId
         </nav>
       </div>
 
-      {/* Banner guía si hay pedido en curso y no estamos en la pantalla de seguimiento */}
+      {/* Banner seguimiento */}
       {showTrackingBanner && (
         <div className="bg-yellow-100 text-yellow-900">
           <div className="container mx-auto px-4 py-2 flex flex-wrap items-center justify-between gap-3">
@@ -148,7 +134,7 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout, trackingOrderId
               Tienes un pedido en preparación: <b>{trackingOrderId}</b>
             </span>
             <button
-              onClick={() => handleNavigate('orderStatus')}
+              onClick={() => handleNavigate('/order-status')}
               className="px-3 py-1 rounded bg-yellow-400 text-black hover:bg-yellow-500"
             >
               Ver seguimiento
@@ -163,12 +149,8 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout, trackingOrderId
           {trackingOrderId && (
             <li>
               <button
-                onClick={() => handleNavigate('orderStatus')}
-                className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                  currentPage === 'orderStatus'
-                    ? 'bg-yellow-500 text-black'
-                    : 'bg-yellow-300 text-black hover:bg-yellow-400'
-                }`}
+                onClick={() => handleNavigate('/order-status')}
+                className="w-full text-left px-3 py-2 rounded-lg bg-yellow-300 text-black hover:bg-yellow-400"
               >
                 Seguimiento
               </button>
@@ -177,10 +159,8 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout, trackingOrderId
 
           <li>
             <button
-              onClick={() => handleNavigate('home')}
-              className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                currentPage === 'home' ? 'bg-red-800' : 'hover:bg-red-600'
-              }`}
+              onClick={() => handleNavigate('/')}
+              className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-600"
             >
               Inicio
             </button>
@@ -188,10 +168,8 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout, trackingOrderId
 
           <li>
             <button
-              onClick={() => handleNavigate('cart')}
-              className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                currentPage === 'cart' ? 'bg-red-800' : 'hover:bg-red-600'
-              }`}
+              onClick={() => handleNavigate('/cart')}
+              className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-600"
             >
               Carrito
             </button>
@@ -200,10 +178,8 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout, trackingOrderId
           {(isButcher || isAdmin) && (
             <li>
               <button
-                onClick={() => handleNavigate('carniceria')}
-                className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                  currentPage === 'carniceria' ? 'bg-red-800' : 'hover:bg-red-600'
-                }`}
+                onClick={() => handleNavigate('/carniceria')}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-600"
               >
                 Pedidos
               </button>
@@ -214,20 +190,16 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout, trackingOrderId
             <>
               <li>
                 <button
-                  onClick={() => handleNavigate('reportes')}
-                  className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                    currentPage === 'reportes' ? 'bg-red-800' : 'hover:bg-red-600'
-                  }`}
+                  onClick={() => handleNavigate('/reportes')}
+                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-600"
                 >
                   Reportes
                 </button>
               </li>
               <li>
                 <button
-                  onClick={() => handleNavigate('logs')}
-                  className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                    currentPage === 'logs' ? 'bg-red-800' : 'hover:bg-red-600'
-                  }`}
+                  onClick={() => handleNavigate('/logs')}
+                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-600"
                 >
                   Logs de Sesión
                 </button>
@@ -238,10 +210,8 @@ const LayoutHeader = ({ onNavigate, currentPage, user, onLogout, trackingOrderId
           {!user ? (
             <li>
               <button
-                onClick={() => handleNavigate('login')}
-                className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                  currentPage === 'login' ? 'bg-red-800' : 'hover:bg-red-600'
-                }`}
+                onClick={() => handleNavigate('/login')}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-600"
               >
                 Iniciar Sesión
               </button>

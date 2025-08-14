@@ -1,10 +1,24 @@
+// backend/models/User.js
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 
 const userSchema = new mongoose.Schema({
-  name:  { type: String, required: true },
-  email: { type: String, required: true, unique: true, index: true },
-  password: { type: String, required: true }, // hash bcrypt
-  role:  { type: String, enum: ['admin', 'carniceria', 'cliente'], default: 'cliente' },
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  role: { type: String, enum: ['admin', 'carniceria', 'cliente'], required: true },
 }, { timestamps: true });
+
+// Hook para cifrar la contraseña antes de guardar
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) return next();
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
 
 export default mongoose.model('User', userSchema);
