@@ -1,5 +1,7 @@
 // src/components/CustomerForm.js
 import React, { useState } from 'react';
+import { apiFetch } from '../utils/api';
+import { useToast } from '../context/ToastContext';
 
 const CustomerForm = ({ onSubmit }) => {
   const [name, setName] = useState('');
@@ -7,15 +9,33 @@ const CustomerForm = ({ onSubmit }) => {
   const [phone, setPhone] = useState('');
   const [note, setNote] = useState('');
   const [pickupTime, setPickupTime] = useState('10:00 AM');
+  const { addToast } = useToast();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (name && phone && email && pickupTime) {
       const customerData = { name, phone, email, pickupTime, note };
-      onSubmit(customerData); // App.js se encargará de redirigir
+
+      try {
+        // ✅ Registrar compra en backend
+        await apiFetch('/api/users/purchase', {
+          method: 'POST',
+          body: JSON.stringify({ email }),
+        });
+
+        addToast('Compra registrada correctamente ✅');
+
+        // 🔔 Emitir evento global para actualizar "Usuarios Frecuentes"
+        window.dispatchEvent(new Event('userFrequentUpdated'));
+
+        // continuar con el flujo normal
+        onSubmit(customerData);
+      } catch (err) {
+        addToast('Error registrando compra ❌', 'error');
+      }
     } else {
-      alert('Por favor, completa todos los campos obligatorios.');
+      addToast('Por favor, completa todos los campos obligatorios.', 'error');
     }
   };
 

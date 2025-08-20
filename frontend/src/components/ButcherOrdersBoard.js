@@ -1,5 +1,5 @@
-// src/components/ButcherOrdersBoard.js
 import React, { useMemo, useState } from "react";
+import OrderReviewModal from "./OrderReviewModal"; // 👈 Importar modal
 
 const toCLP = (n) =>
   (n ?? 0).toLocaleString("es-CL", {
@@ -74,7 +74,20 @@ function inDateRange(createdAt, startISO, endISO) {
   return true;
 }
 
+// 🔹 Normaliza los estados para que siempre se muestren bien
+function normalizeStatus(status) {
+  if (!status) return "Pendiente";
+  const s = status.toLowerCase();
+  if (s.includes("pendiente")) return "Pendiente";
+  if (s.includes("preparacion")) return "En preparación";
+  if (s.includes("listo")) return "Listo";
+  if (s.includes("entregado")) return "Entregado";
+  return status;
+}
+
 function OrderCard({ order, onUpdate, onDelete }) {
+  const [showModal, setShowModal] = useState(false); // 👈 controlar modal
+
   const total =
     typeof order.totalCLP === "number"
       ? order.totalCLP
@@ -84,20 +97,32 @@ function OrderCard({ order, onUpdate, onDelete }) {
           0
         );
 
+  const status = normalizeStatus(order.status);
+
+  // 🔹 Guardar cambios desde el modal
+  const handleSave = (updatedItems) => {
+    const newTotal = updatedItems.reduce(
+      (s, it) => s + (it.price ?? 0) * (it.quantity ?? 0),
+      0
+    );
+    onUpdate(order.id, "Listo", updatedItems, newTotal); // 👈 pasamos items y total
+    setShowModal(false);
+  };
+
   return (
     <div className="bg-white rounded-lg shadow p-4 border">
       <div className="flex items-center justify-between">
         <h4 className="font-semibold">#{order.id}</h4>
         <span
           className={`text-xs px-2 py-1 rounded ${
-            order.status === "Pendiente"
+            status === "Pendiente" || status === "En preparación"
               ? "bg-yellow-100 text-yellow-800"
-              : order.status === "Listo"
+              : status === "Listo"
               ? "bg-blue-100 text-blue-800"
               : "bg-green-100 text-green-800"
           }`}
         >
-          {order.status}
+          {status}
         </span>
       </div>
 
@@ -122,21 +147,21 @@ function OrderCard({ order, onUpdate, onDelete }) {
       </ul>
 
       <div className="flex flex-wrap gap-2 mt-3">
-        {order.status === "Pendiente" && (
+        {(status === "Pendiente" || status === "En preparación") && (
           <button
             className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
-            onClick={() => onUpdate(order.id, "Listo")}
+            onClick={() => setShowModal(true)} // 👈 abrir modal
           >
-            Marcar LISTO
+            Ajustar y Marcar LISTO
           </button>
         )}
-        {order.status === "Listo" && (
+        {status === "Listo" && (
           <>
             <button
               className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
               onClick={() => onUpdate(order.id, "Pendiente")}
             >
-              Volver a Pendiente
+              Volver a En preparación
             </button>
             <button
               className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700"
@@ -146,13 +171,12 @@ function OrderCard({ order, onUpdate, onDelete }) {
             </button>
           </>
         )}
-        {order.status === "Entregado" && (
+        {status === "Entregado" && (
           <span className="text-xs text-gray-500">
             Entregado (solo historial)
           </span>
         )}
 
-        {/* 🗑 Eliminar (carnicería y admin) */}
         {onDelete && (
           <button
             className="ml-auto px-3 py-1 rounded bg-red-600 text-white hover:bg-red-700"
@@ -164,6 +188,15 @@ function OrderCard({ order, onUpdate, onDelete }) {
           </button>
         )}
       </div>
+
+      {/* 🔹 Modal de ajuste */}
+      {showModal && (
+        <OrderReviewModal
+          order={order}
+          onSave={handleSave}
+          onClose={() => setShowModal(false)}
+        />
+      )}
     </div>
   );
 }
@@ -178,7 +211,7 @@ function OrderCard({ order, onUpdate, onDelete }) {
 export default function ButcherOrdersBoard({
   orders,
   onUpdateStatus,
-  onDeleteOrder,   // 👈 NUEVO
+  onDeleteOrder,
   isAdmin = false,
 }) {
   const [showDelivered, setShowDelivered] = useState(false);
@@ -189,13 +222,7 @@ export default function ButcherOrdersBoard({
 
   const q = norm(query.trim());
 
-  const {
-    filteredCount,
-    totalCount,
-    pending,
-    ready,
-    delivered,
-  } = useMemo(() => {
+  const { filteredCount, totalCount, pending, ready, delivered } = useMemo(() => {
     const total = (orders || []).length;
 
     const filtered = (orders || []).filter((o) => {
@@ -212,8 +239,9 @@ export default function ButcherOrdersBoard({
     const r = [];
     const d = [];
     for (const o of filtered) {
-      if (o.status === "Entregado") d.push(o);
-      else if (o.status === "Listo") r.push(o);
+      const status = normalizeStatus(o.status);
+      if (status === "Entregado") d.push(o);
+      else if (status === "Listo") r.push(o);
       else p.push(o);
     }
     const sortFn = (a, b) =>
@@ -234,16 +262,13 @@ export default function ButcherOrdersBoard({
     setDateEnd("");
   };
 
-  // confirmación de borrado
   const confirmDelete = (orderId) => {
-    if (
-      window.confirm(
-        `¿Eliminar el pedido ${orderId}? Esta acción es permanente.`
-      )
-    ) {
+    if (window.confirm(`¿Eliminar el pedido ${orderId}? Esta acción es permanente.`)) {
       onDeleteOrder?.(orderId);
     }
   };
+
+
 
   return (
     <section>
@@ -263,8 +288,7 @@ export default function ButcherOrdersBoard({
                 stroke="currentColor"
                 aria-hidden="true"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                  d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z" />
               </svg>
               <input
                 value={query}
@@ -289,7 +313,7 @@ export default function ButcherOrdersBoard({
             </p>
           </div>
 
-          {/* Toggle entregados (solo admin) */}
+          {/* Toggle entregados */}
           {isAdmin && (
             <label className="text-sm flex items-center gap-2">
               <input
@@ -302,7 +326,7 @@ export default function ButcherOrdersBoard({
           )}
         </div>
 
-        {/* Filtros adicionales */}
+        {/* Filtros */}
         <div className="flex flex-col md:flex-row gap-3 md:items-center">
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-700">Tramo horario:</span>
@@ -312,7 +336,9 @@ export default function ButcherOrdersBoard({
               className="bg-white border rounded px-2 py-1 text-sm"
             >
               {HOUR_BUCKETS.map((b) => (
-                <option key={b.id} value={b.id}>{b.label}</option>
+                <option key={b.id} value={b.id}>
+                  {b.label}
+                </option>
               ))}
             </select>
           </div>
@@ -407,7 +433,7 @@ export default function ButcherOrdersBoard({
           </div>
         </div>
 
-        {/* Entregados (historial, solo admin) */}
+        {/* Entregados */}
         {isAdmin && showDelivered && (
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -421,7 +447,7 @@ export default function ButcherOrdersBoard({
                     key={o.id}
                     order={o}
                     onUpdate={onUpdateStatus}
-                    onDelete={confirmDelete} // permitir borrar del historial también
+                    onDelete={confirmDelete}
                   />
                 ))
               ) : (

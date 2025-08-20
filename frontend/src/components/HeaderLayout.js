@@ -1,233 +1,173 @@
 // src/components/HeaderLayout.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ShoppingCart } from 'lucide-react'; // ✅ Icono carrito (lucide-react recomendado)
+import OrderTrackerBanner from './OrderTrackerBanner';
 
-const LayoutHeader = ({ user, onLogout, trackingOrderId }) => {
+const LayoutHeader = ({ user, onLogout, cartCount }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [title, setTitle] = useState("Carnes Beniken");
+  const [fade, setFade] = useState(true);
   const isAdmin = user?.role === 'admin';
   const isButcher = user?.role === 'carniceria';
   const navigate = useNavigate();
 
   const handleNavigate = (path) => {
     navigate(path);
-    setIsMenuOpen(false); // cerrar menú móvil al navegar
+    setIsMenuOpen(false);
   };
 
-  const showTrackingBanner = trackingOrderId;
+  // 👇 Alternar entre "Carnes Beniken" y "Local 382" con fade
+  useEffect(() => {
+    const titles = ["Carnes Beniken", "Local 382"];
+    let index = 0;
+
+    const interval = setInterval(() => {
+      setFade(false);
+      setTimeout(() => {
+        index = (index + 1) % titles.length;
+        setTitle(titles[index]);
+        setFade(true);
+      }, 500);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
-    <header className="bg-red-700 text-white shadow-md">
+    <header className="bg-red-700 text-white shadow-md sticky top-0 z-50">
+      {/* 🔔 Banner de seguimiento */}
+      <OrderTrackerBanner />
+
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+        {/* 👇 Título animado */}
         <h1
-          className="text-3xl font-bold cursor-pointer"
+          className={`text-3xl font-bold cursor-pointer transition-opacity duration-500 ${
+            fade ? "opacity-100" : "opacity-0"
+          }`}
           onClick={() => handleNavigate('/')}
         >
-          Carnes Beniken
+          {title}
         </h1>
 
-        {/* Botón menú móvil */}
-        <div className="md:hidden">
-          <button
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="text-white focus:outline-none"
-            aria-label="Abrir menú"
-          >
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
+        {/* 🔹 Menú desktop */}
+        <nav className="hidden md:flex space-x-6 items-center">
+          <button onClick={() => handleNavigate('/')} className="hover:text-gray-200">
+            Inicio
           </button>
-        </div>
 
-        {/* Menú desktop */}
-        <nav className="hidden md:block">
-          <ul className="flex space-x-3">
-            {trackingOrderId && (
-              <li>
-                <button
-                  onClick={() => handleNavigate('/order-status')}
-                  className="px-3 py-2 rounded-lg bg-yellow-300 text-black hover:bg-yellow-400"
-                >
-                  Seguimiento
-                </button>
-              </li>
+          {/* ✅ Carrito con icono y contador */}
+          <button
+            onClick={() => handleNavigate('/cart')}
+            className="relative flex items-center hover:text-gray-200"
+          >
+            <ShoppingCart className="w-6 h-6" />
+            {cartCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-yellow-400 text-black text-xs font-bold px-2 py-0.5 rounded-full">
+                {cartCount}
+              </span>
             )}
-
-            <li>
-              <button
-                onClick={() => handleNavigate('/')}
-                className="px-3 py-2 rounded-lg hover:bg-red-600"
-              >
-                Inicio
-              </button>
-            </li>
-
-            <li>
-              <button
-                onClick={() => handleNavigate('/cart')}
-                className="px-3 py-2 rounded-lg hover:bg-red-600"
-              >
-                Carrito
-              </button>
-            </li>
-
-            {(isButcher || isAdmin) && (
-              <li>
-                <button
-                  onClick={() => handleNavigate('/carniceria')}
-                  className="px-3 py-2 rounded-lg hover:bg-red-600"
-                >
-                  Pedidos
-                </button>
-              </li>
-            )}
-
-            {isAdmin && (
-              <>
-                <li>
-                  <button
-                    onClick={() => handleNavigate('/reportes')}
-                    className="px-3 py-2 rounded-lg hover:bg-red-600"
-                  >
-                    Reportes
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => handleNavigate('/logs')}
-                    className="px-3 py-2 rounded-lg hover:bg-red-600"
-                  >
-                    Logs de Sesión
-                  </button>
-                </li>
-              </>
-            )}
-
-            {!user ? (
-              <li>
-                <button
-                  onClick={() => handleNavigate('/login')}
-                  className="px-3 py-2 rounded-lg hover:bg-red-600"
-                >
-                  Iniciar Sesión
-                </button>
-              </li>
-            ) : (
-              <li>
-                <button
-                  onClick={onLogout}
-                  className="px-3 py-2 rounded-lg hover:bg-red-600"
-                >
-                  Cerrar Sesión
-                </button>
-              </li>
-            )}
-          </ul>
-        </nav>
-      </div>
-
-      {/* Banner seguimiento */}
-      {showTrackingBanner && (
-        <div className="bg-yellow-100 text-yellow-900">
-          <div className="container mx-auto px-4 py-2 flex flex-wrap items-center justify-between gap-3">
-            <span>
-              Tienes un pedido en preparación: <b>{trackingOrderId}</b>
-            </span>
-            <button
-              onClick={() => handleNavigate('/order-status')}
-              className="px-3 py-1 rounded bg-yellow-400 text-black hover:bg-yellow-500"
-            >
-              Ver seguimiento
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Menú móvil */}
-      <nav className={`md:hidden ${isMenuOpen ? 'block' : 'hidden'} px-4 pb-4`}>
-        <ul className="mt-3 space-y-2">
-          {trackingOrderId && (
-            <li>
-              <button
-                onClick={() => handleNavigate('/order-status')}
-                className="w-full text-left px-3 py-2 rounded-lg bg-yellow-300 text-black hover:bg-yellow-400"
-              >
-                Seguimiento
-              </button>
-            </li>
-          )}
-
-          <li>
-            <button
-              onClick={() => handleNavigate('/')}
-              className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-600"
-            >
-              Inicio
-            </button>
-          </li>
-
-          <li>
-            <button
-              onClick={() => handleNavigate('/cart')}
-              className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-600"
-            >
-              Carrito
-            </button>
-          </li>
+          </button>
 
           {(isButcher || isAdmin) && (
-            <li>
-              <button
-                onClick={() => handleNavigate('/carniceria')}
-                className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-600"
-              >
-                Pedidos
-              </button>
-            </li>
+            <button onClick={() => handleNavigate('/carniceria')} className="hover:text-gray-200">
+              Carnicería
+            </button>
           )}
-
           {isAdmin && (
             <>
-              <li>
-                <button
-                  onClick={() => handleNavigate('/reportes')}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-600"
-                >
-                  Reportes
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => handleNavigate('/logs')}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-600"
-                >
-                  Logs de Sesión
-                </button>
-              </li>
+              <button onClick={() => handleNavigate('/usuarios')} className="hover:text-gray-200">
+                Usuarios
+              </button>
+              <button onClick={() => handleNavigate('/reportes')} className="hover:text-gray-200">
+                Reportes
+              </button>
+              <button onClick={() => handleNavigate('/logs')} className="hover:text-gray-200">
+                Logs
+              </button>
             </>
           )}
-
-          {!user ? (
-            <li>
-              <button
-                onClick={() => handleNavigate('/login')}
-                className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-600"
-              >
-                Iniciar Sesión
-              </button>
-            </li>
+          {user ? (
+            <button onClick={onLogout} className="hover:text-gray-200">
+              Cerrar sesión
+            </button>
           ) : (
-            <li>
-              <button
-                onClick={() => { onLogout(); setIsMenuOpen(false); }}
-                className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-600"
-              >
-                Cerrar Sesión
-              </button>
-            </li>
+            <button onClick={() => handleNavigate('/login')} className="hover:text-gray-200">
+              Iniciar sesión
+            </button>
           )}
-        </ul>
-      </nav>
+        </nav>
+
+        {/* 🔹 Botón hamburguesa en móvil */}
+        <button
+          className="md:hidden focus:outline-none"
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+        >
+          <svg
+            className="w-8 h-8"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            {isMenuOpen ? (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            ) : (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+            )}
+          </svg>
+        </button>
+      </div>
+
+      {/* 🔹 Menú móvil */}
+      {isMenuOpen && (
+        <nav className="md:hidden bg-red-600 text-white px-4 py-4 space-y-3">
+          <button onClick={() => handleNavigate('/')} className="block w-full text-left">
+            Inicio
+          </button>
+
+          {/* ✅ Carrito con contador en móvil */}
+          <button
+            onClick={() => handleNavigate('/cart')}
+            className="block w-full text-left flex items-center gap-2"
+          >
+            <ShoppingCart className="w-5 h-5" />
+            Carrito
+            {cartCount > 0 && (
+              <span className="ml-2 bg-yellow-400 text-black text-xs font-bold px-2 py-0.5 rounded-full">
+                {cartCount}
+              </span>
+            )}
+          </button>
+
+          {(isButcher || isAdmin) && (
+            <button onClick={() => handleNavigate('/carniceria')} className="block w-full text-left">
+              Carnicería
+            </button>
+          )}
+          {isAdmin && (
+            <>
+              <button onClick={() => handleNavigate('/usuarios')} className="block w-full text-left">
+                Usuarios
+              </button>
+              <button onClick={() => handleNavigate('/reportes')} className="block w-full text-left">
+                Reportes
+              </button>
+              <button onClick={() => handleNavigate('/logs')} className="block w-full text-left">
+                Logs
+              </button>
+            </>
+          )}
+          {user ? (
+            <button onClick={onLogout} className="block w-full text-left">
+              Cerrar sesión
+            </button>
+          ) : (
+            <button onClick={() => handleNavigate('/login')} className="block w-full text-left">
+              Iniciar sesión
+            </button>
+          )}
+        </nav>
+      )}
     </header>
   );
 };

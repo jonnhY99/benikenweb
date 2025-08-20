@@ -10,21 +10,28 @@ import CustomerForm from './components/CustomerForm.js';
 import LoginForm from './components/LoginForm.js';
 import AdminOrderCard from './components/AdminOrderItem.js';
 import AdminLoginLogs from './components/AdminLoginLogs.js';
-import AdminReports from './components/AdminReports';
-import ButcherOrdersBoard from './components/ButcherOrdersBoard';
+import AdminReports from './components/AdminReports.js';
+import ButcherOrdersBoard from './components/ButcherOrdersBoard.js';
 import OrderStatusPage from './components/OrderStatusPage.js';
 import PaymentPage from './components/PaymentPage.js';
+import PayWeb from "./components/payweb";
+import Usuarios from './components/Usuarios.js';
+
+import HeroSection from './components/HeroSection.js';
+import TestimonialsSection from './components/TestimonialsSection.js';
+import GallerySection from './components/GallerySection.js';
+import LayoutFooter from './components/LayoutFooter.js';
 
 import { createStorage, setStorage } from './utils/storage.js';
-import { initSocket, getSocket, disconnectSocket } from './utils/socket';
+import { initSocket, getSocket, disconnectSocket } from './utils/socket.js';
 
 import {
   fetchOrders,
   createOrder,
   updateOrderStatus,
   deleteOrder,
-} from './api/orders';
-import { fetchProducts } from './api/products';
+} from './api/orders.js';
+import { fetchProducts } from './api/products.js';
 
 const App = () => {
   const [products, setProducts] = useState([]);
@@ -44,6 +51,7 @@ const App = () => {
 
   const navigate = useNavigate();
 
+  // 🔹 persistir trackingId
   useEffect(() => {
     if (trackingOrderId) {
       localStorage.setItem('trackingOrderId', trackingOrderId);
@@ -54,11 +62,13 @@ const App = () => {
 
   useEffect(() => setStorage('cart', cart), [cart]);
 
+  // 🔹 cargar productos y pedidos
   useEffect(() => {
     fetchProducts().then(setProducts).catch((e) => console.error('fetchProducts error:', e));
     fetchOrders().then(setAllOrders).catch((e) => console.error('fetchOrders error:', e));
   }, []);
 
+  // 🔹 socket
   useEffect(() => {
     const userId = user?.id || null;
     const s = initSocket(userId);
@@ -105,6 +115,7 @@ const App = () => {
     navigate('/');
   };
 
+  // 🔹 añadir al carrito
   const handleAddToCart = (product, quantity) => {
     setCart((prevCart) => {
       const existing = prevCart.find((i) => i.productId === product.id);
@@ -149,6 +160,7 @@ const App = () => {
     setCart((prevCart) => prevCart.filter((i) => i.productId !== productId));
   };
 
+  // 🔹 cuando cliente confirma pedido → ir a seguimiento
   const handlePlaceOrder = async (customerInfo) => {
     if (!cart.length) {
       alert('El carrito está vacío. Agrega productos antes de confirmar el pedido.');
@@ -177,10 +189,11 @@ const App = () => {
 
       setTrackingOrderId(created.id);
       localStorage.setItem('trackingOrderId', created.id);
-      localStorage.setItem('paymentTotal', totalCLP); // 💾 Guardar total para PaymentPage
+      localStorage.setItem('paymentTotal', totalCLP);
       setCart([]);
 
-      navigate('/payment');
+      // ✅ ahora va a la página de seguimiento del pedido
+      navigate(`/order-status`);
     } catch (err) {
       console.error(err);
       alert('No se pudo crear el pedido (¿stock insuficiente?).');
@@ -220,59 +233,66 @@ const App = () => {
   const isButcher = user?.role === 'carniceria';
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <LayoutHeader user={user} onLogout={handleLogout} trackingOrderId={trackingOrderId} />
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      {/* ✅ Header con carrito */}
+      <LayoutHeader
+        user={user}
+        onLogout={handleLogout}
+        cartCount={cart.reduce((acc, i) => acc + i.quantity, 0)}
+      />
 
-      <main className="container mx-auto p-6">
+      <main className="flex-1 container mx-auto p-6">
         <Routes>
-          <Route path="/" element={<ProductList products={products} onAddToCart={handleAddToCart} />} />
+          <Route path="/" element={<><HeroSection /><TestimonialsSection /><GallerySection /></>} />
           <Route path="/login" element={<LoginForm onLoginSuccess={(u) => { setUser(u); navigate('/'); }} />} />
-          <Route
-            path="/cart"
-            element={
-              cart.length === 0 ? (
-                <p className="text-center text-gray-600 text-xl">
-                  Tu carrito está vacío. ¡Agrega algo de carnita!
-                </p>
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  <div className="lg:col-span-2 space-y-4">
-                    {cart.map((item) => (
-                      <CartItem
-                        key={item.productId}
-                        item={item}
-                        onUpdateQuantity={handleUpdateCartQuantity}
-                        onRemoveItem={handleRemoveFromCart}
-                      />
-                    ))}
-                  </div>
-                  <div className="lg:col-span-1">
-                    <OrderSummary cartItems={cart} />
-                    <div className="mt-6">
-                      <CustomerForm onSubmit={handlePlaceOrder} />
-                    </div>
+
+          {/* 🔹 Carrito */}
+          <Route path="/cart" element={
+            cart.length === 0 ? (
+              <p className="text-center text-gray-600 text-xl">Tu carrito está vacío. ¡Agrega algo de carnita!</p>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-4">
+                  {cart.map((item) => (
+                    <CartItem
+                      key={item.productId}
+                      item={item}
+                      onUpdateQuantity={handleUpdateCartQuantity}
+                      onRemoveItem={handleRemoveFromCart}
+                    />
+                  ))}
+                </div>
+                <div className="lg:col-span-1">
+                  <OrderSummary cartItems={cart} />
+                  <div className="mt-6">
+                    <CustomerForm onSubmit={handlePlaceOrder} />
                   </div>
                 </div>
-              )
-            }
-          />
-          <Route
-            path="/payment"
-            element={
-              <PaymentPage
-                total={Number(localStorage.getItem('paymentTotal')) || calculateCartTotal}
-                orderId={trackingOrderId || localStorage.getItem('trackingOrderId')}
-                onPaymentComplete={() => navigate('/order-status')}
-              />
-            }
-          />
+              </div>
+            )
+          } />
+
+          {/* 🔹 Pago después de revisión */}
+          <Route path="/payment/:id" element={
+            <PaymentPage
+              total={Number(localStorage.getItem('paymentTotal')) || calculateCartTotal}
+              orderId={trackingOrderId || localStorage.getItem('trackingOrderId')}
+              onPaymentComplete={() => navigate('/order-status')}
+            />
+          } />
+
           <Route path="/order-status" element={<OrderStatusPage orderId={trackingOrderId} onGoHome={() => navigate('/')} />} />
           <Route path="/carniceria" element={isButcher || isAdmin ? <ButcherOrdersBoard orders={allOrders} onUpdateStatus={handleUpdateOrderStatus} onDeleteOrder={handleDeleteOrder} isAdmin={isAdmin} /> : <p className="text-center text-red-600">No tienes permisos para ver esta sección.</p>} />
           <Route path="/admin" element={<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{allOrders.map((order) => (<AdminOrderCard key={order.id} order={order} onUpdateStatus={handleUpdateOrderStatus} />))}</div>} />
           <Route path="/logs" element={isAdmin ? <AdminLoginLogs /> : <p className="text-center text-red-600">No tienes permisos para ver esta sección.</p>} />
           <Route path="/reportes" element={isAdmin ? <AdminReports /> : <p className="text-center text-red-600">No tienes permisos para ver esta sección.</p>} />
+          <Route path="/usuarios" element={isAdmin ? <Usuarios /> : <p className="text-center text-red-600">No tienes permisos para ver esta sección.</p>} />
+          <Route path="/productos" element={<ProductList products={products} onAddToCart={handleAddToCart} />} />
+          <Route path="/payweb" element={<PayWeb />} />
         </Routes>
       </main>
+
+      <LayoutFooter />
     </div>
   );
 };

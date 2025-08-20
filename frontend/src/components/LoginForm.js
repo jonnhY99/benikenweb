@@ -1,39 +1,34 @@
-import React, { useState } from 'react';
-import { apiFetch } from '../utils/api'; // ← asegura esta ruta correcta: src/utils/api.js
+// src/components/LoginForm.js
+import React, { useState } from "react";
+import { apiFetch } from "../utils/api";
+import { useToast } from "../context/ToastContext";
 
 const LoginForm = ({ onLoginSuccess }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const { addToast } = useToast();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-
     try {
-      // SOLO email y password
-      const data = await apiFetch('/api/auth/login', {
-        method: 'POST',
+      const data = await apiFetch("/api/auth/login", {
+        method: "POST",
         body: JSON.stringify({ email, password }),
       });
 
-      // Guarda credenciales
-      localStorage.setItem('authToken', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem("authToken", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
 
-      // callback hacia App
+      addToast("Bienvenido " + data.user.name, "success");
       onLoginSuccess?.(data.user);
     } catch (err) {
-      // Mensaje que venga del backend o genérico
-      const msg = err?.message || 'Correo o contraseña inválidos';
-      setError(msg);
+      addToast(err?.message || "Correo o contraseña inválidos", "error");
     }
   };
 
   return (
     <div className="max-w-md mx-auto mt-10 bg-white shadow-lg rounded-lg p-6">
       <h2 className="text-2xl font-bold mb-4 text-center">Iniciar Sesión</h2>
-      {error && <p className="text-red-600 text-center mb-2">{error}</p>}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
