@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import OrderReviewModal from "./OrderReviewModal"; // 👈 Importar modal
+import { confirmOrderWeights } from "../api/orders"; // 👈 Importar API function
 
 const toCLP = (n) =>
   (n ?? 0).toLocaleString("es-CL", {
@@ -100,13 +101,20 @@ function OrderCard({ order, onUpdate, onDelete }) {
   const status = normalizeStatus(order.status);
 
   // 🔹 Guardar cambios desde el modal
-  const handleSave = (updatedItems) => {
-    const newTotal = updatedItems.reduce(
-      (s, it) => s + (it.price ?? 0) * (it.quantity ?? 0),
-      0
-    );
-    onUpdate(order.id, "Listo", updatedItems, newTotal); // 👈 pasamos items y total
-    setShowModal(false);
+  const handleSave = async (updatedItems) => {
+    try {
+      // Llamar al backend para guardar los pesos exactos y marcar como listo
+      await confirmOrderWeights(order.id, updatedItems);
+      
+      // Cerrar modal después de éxito
+      setShowModal(false);
+      
+      // Opcional: recargar datos si es necesario (el socket ya debería actualizar)
+      // onUpdate podría ser usado para refrescar la lista local si es necesario
+    } catch (error) {
+      console.error("Error al confirmar pesos:", error);
+      alert("Error al confirmar los pesos. Por favor, intenta nuevamente.");
+    }
   };
 
   return (
@@ -141,7 +149,7 @@ function OrderCard({ order, onUpdate, onDelete }) {
       <ul className="text-sm text-gray-700 mt-2 list-disc ml-5">
         {(order.items || []).map((it, idx) => (
           <li key={idx}>
-            {it.name} — {it.quantity} {it.unit || "kg"}
+            {it.name} — {Number(it.quantity).toFixed(3)} {it.unit || "kg"}
           </li>
         ))}
       </ul>

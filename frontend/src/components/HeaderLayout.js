@@ -1,7 +1,7 @@
 // src/components/HeaderLayout.js
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ShoppingCart } from 'lucide-react'; // ✅ Icono carrito (lucide-react recomendado)
+import { useNavigate, useLocation } from 'react-router-dom';
+import { ShoppingCart, Menu, X, Phone } from 'lucide-react';
 import OrderTrackerBanner from './OrderTrackerBanner';
 
 const LayoutHeader = ({ user, onLogout, cartCount }) => {
@@ -11,6 +11,10 @@ const LayoutHeader = ({ user, onLogout, cartCount }) => {
   const isAdmin = user?.role === 'admin';
   const isButcher = user?.role === 'carniceria';
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Hide tracking banner on order status page
+  const shouldShowTrackingBanner = location.pathname !== '/order-status';
 
   const handleNavigate = (path) => {
     navigate(path);
@@ -35,138 +39,204 @@ const LayoutHeader = ({ user, onLogout, cartCount }) => {
   }, []);
 
   return (
-    <header className="bg-red-700 text-white shadow-md sticky top-0 z-50">
-      {/* 🔔 Banner de seguimiento */}
-      <OrderTrackerBanner />
+    <header className="fixed top-0 w-full bg-gradient-to-r from-red-800 via-red-700 to-red-600 backdrop-blur-sm border-b border-red-500/20 shadow-lg z-50">
+      {/* 🔔 Banner de seguimiento - oculto en página de estado del pedido */}
+      {shouldShowTrackingBanner && <OrderTrackerBanner />}
 
-      <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-        {/* 👇 Título animado */}
-        <h1
-          className={`text-3xl font-bold cursor-pointer transition-opacity duration-500 ${
-            fade ? "opacity-100" : "opacity-0"
-          }`}
-          onClick={() => handleNavigate('/')}
-        >
-          {title}
-        </h1>
+      <div className="container mx-auto px-4">
+        <div className="flex items-center justify-between h-16">
+          {/* 👇 Logo/Título animado con diseño moderno */}
+          <div className="flex items-center">
+            <h1
+              className={`text-2xl md:text-3xl font-bold cursor-pointer transition-all duration-500 text-white drop-shadow-lg hover:scale-105 ${
+                fade ? "opacity-100" : "opacity-0"
+              }`}
+              onClick={() => handleNavigate('/')}
+            >
+              {title}
+            </h1>
+          </div>
 
-        {/* 🔹 Menú desktop */}
-        <nav className="hidden md:flex space-x-6 items-center">
-          <button onClick={() => handleNavigate('/')} className="hover:text-gray-200">
-            Inicio
-          </button>
+          {/* 🔹 Menú desktop con diseño moderno */}
+          <nav className="hidden md:flex items-center space-x-6">
+            <button 
+              onClick={() => handleNavigate('/')} 
+              className="text-white hover:text-yellow-300 transition-colors duration-200 font-medium px-3 py-2 rounded-lg hover:bg-white/10"
+            >
+              Inicio
+            </button>
 
-          {/* ✅ Carrito con icono y contador */}
-          <button
-            onClick={() => handleNavigate('/cart')}
-            className="relative flex items-center hover:text-gray-200"
-          >
-            <ShoppingCart className="w-6 h-6" />
-            {cartCount > 0 && (
-              <span className="absolute -top-2 -right-2 bg-yellow-400 text-black text-xs font-bold px-2 py-0.5 rounded-full">
-                {cartCount}
-              </span>
+            {/* ✅ Carrito con diseño moderno */}
+            <button
+              onClick={() => handleNavigate('/cart')}
+              className="relative flex items-center text-white hover:text-yellow-300 transition-colors duration-200 font-medium px-3 py-2 rounded-lg hover:bg-white/10"
+            >
+              <ShoppingCart className="w-5 h-5 mr-1" />
+              <span className="hidden lg:inline">Carrito</span>
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-yellow-400 text-red-800 text-xs font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+
+            {(isButcher || isAdmin) && (
+              <button 
+                onClick={() => handleNavigate('/carniceria')} 
+                className="text-white hover:text-yellow-300 transition-colors duration-200 font-medium px-3 py-2 rounded-lg hover:bg-white/10"
+              >
+                Carnicería
+              </button>
             )}
-          </button>
+            {isAdmin && (
+              <>
+                <button 
+                  onClick={() => handleNavigate('/usuarios')} 
+                  className="text-white hover:text-yellow-300 transition-colors duration-200 font-medium px-3 py-2 rounded-lg hover:bg-white/10"
+                >
+                  Usuarios
+                </button>
+                <button 
+                  onClick={() => handleNavigate('/reportes')} 
+                  className="text-white hover:text-yellow-300 transition-colors duration-200 font-medium px-3 py-2 rounded-lg hover:bg-white/10"
+                >
+                  Reportes
+                </button>
+                <button 
+                  onClick={() => handleNavigate('/logs')} 
+                  className="text-white hover:text-yellow-300 transition-colors duration-200 font-medium px-3 py-2 rounded-lg hover:bg-white/10"
+                >
+                  Logs
+                </button>
+              </>
+            )}
+            
+            {/* Botón de llamar con diseño moderno */}
+            <a
+              href="https://wa.me/56912345678"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden lg:flex items-center bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors duration-200 shadow-lg"
+            >
+              <Phone className="w-4 h-4 mr-2" />
+              Llamar Ahora
+            </a>
 
-          {(isButcher || isAdmin) && (
-            <button onClick={() => handleNavigate('/carniceria')} className="hover:text-gray-200">
-              Carnicería
-            </button>
-          )}
-          {isAdmin && (
-            <>
-              <button onClick={() => handleNavigate('/usuarios')} className="hover:text-gray-200">
-                Usuarios
+            {user ? (
+              <button 
+                onClick={onLogout} 
+                className="bg-white/20 hover:bg-white/30 text-white font-medium px-4 py-2 rounded-lg transition-colors duration-200"
+              >
+                Cerrar sesión
               </button>
-              <button onClick={() => handleNavigate('/reportes')} className="hover:text-gray-200">
-                Reportes
+            ) : (
+              <button 
+                onClick={() => handleNavigate('/login')} 
+                className="bg-yellow-500 hover:bg-yellow-600 text-red-800 font-medium px-4 py-2 rounded-lg transition-colors duration-200 shadow-lg"
+              >
+                Iniciar sesión
               </button>
-              <button onClick={() => handleNavigate('/logs')} className="hover:text-gray-200">
-                Logs
-              </button>
-            </>
-          )}
-          {user ? (
-            <button onClick={onLogout} className="hover:text-gray-200">
-              Cerrar sesión
-            </button>
-          ) : (
-            <button onClick={() => handleNavigate('/login')} className="hover:text-gray-200">
-              Iniciar sesión
-            </button>
-          )}
-        </nav>
+            )}
+          </nav>
 
-        {/* 🔹 Botón hamburguesa en móvil */}
-        <button
-          className="md:hidden focus:outline-none"
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
-        >
-          <svg
-            className="w-8 h-8"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+          {/* 🔹 Botón hamburguesa moderno en móvil */}
+          <button
+            className="md:hidden p-2 rounded-lg hover:bg-white/10 transition-colors duration-200"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
           >
             {isMenuOpen ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              <X className="w-6 h-6 text-white" />
             ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+              <Menu className="w-6 h-6 text-white" />
             )}
-          </svg>
-        </button>
+          </button>
+        </div>
       </div>
 
-      {/* 🔹 Menú móvil */}
+      {/* 🔹 Menú móvil con diseño moderno */}
       {isMenuOpen && (
-        <nav className="md:hidden bg-red-600 text-white px-4 py-4 space-y-3">
-          <button onClick={() => handleNavigate('/')} className="block w-full text-left">
-            Inicio
-          </button>
+        <div className="md:hidden bg-gradient-to-b from-red-700 to-red-800 border-t border-red-500/20 backdrop-blur-sm">
+          <nav className="px-4 py-4 space-y-2">
+            <button 
+              onClick={() => handleNavigate('/')} 
+              className="block w-full text-left text-white hover:text-yellow-300 font-medium py-3 px-4 rounded-lg hover:bg-white/10 transition-colors duration-200"
+            >
+              Inicio
+            </button>
 
-          {/* ✅ Carrito con contador en móvil */}
-          <button
-            onClick={() => handleNavigate('/cart')}
-            className="block w-full text-left flex items-center gap-2"
-          >
-            <ShoppingCart className="w-5 h-5" />
-            Carrito
-            {cartCount > 0 && (
-              <span className="ml-2 bg-yellow-400 text-black text-xs font-bold px-2 py-0.5 rounded-full">
-                {cartCount}
-              </span>
+            {/* ✅ Carrito con contador en móvil */}
+            <button
+              onClick={() => handleNavigate('/cart')}
+              className="flex items-center w-full text-white hover:text-yellow-300 font-medium py-3 px-4 rounded-lg hover:bg-white/10 transition-colors duration-200"
+            >
+              <ShoppingCart className="w-5 h-5 mr-3" />
+              Carrito
+              {cartCount > 0 && (
+                <span className="ml-auto bg-yellow-400 text-red-800 text-xs font-bold px-2 py-1 rounded-full">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+
+            {(isButcher || isAdmin) && (
+              <button 
+                onClick={() => handleNavigate('/carniceria')} 
+                className="block w-full text-left text-white hover:text-yellow-300 font-medium py-3 px-4 rounded-lg hover:bg-white/10 transition-colors duration-200"
+              >
+                Carnicería
+              </button>
             )}
-          </button>
+            {isAdmin && (
+              <>
+                <button 
+                  onClick={() => handleNavigate('/usuarios')} 
+                  className="block w-full text-left text-white hover:text-yellow-300 font-medium py-3 px-4 rounded-lg hover:bg-white/10 transition-colors duration-200"
+                >
+                  Usuarios
+                </button>
+                <button 
+                  onClick={() => handleNavigate('/reportes')} 
+                  className="block w-full text-left text-white hover:text-yellow-300 font-medium py-3 px-4 rounded-lg hover:bg-white/10 transition-colors duration-200"
+                >
+                  Reportes
+                </button>
+                <button 
+                  onClick={() => handleNavigate('/logs')} 
+                  className="block w-full text-left text-white hover:text-yellow-300 font-medium py-3 px-4 rounded-lg hover:bg-white/10 transition-colors duration-200"
+                >
+                  Logs
+                </button>
+              </>
+            )}
+            
+            {/* Botón de llamar en móvil */}
+            <a
+              href="https://wa.me/56912345678"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200 mt-2"
+            >
+              <Phone className="w-4 h-4 mr-3" />
+              Llamar Ahora
+            </a>
 
-          {(isButcher || isAdmin) && (
-            <button onClick={() => handleNavigate('/carniceria')} className="block w-full text-left">
-              Carnicería
-            </button>
-          )}
-          {isAdmin && (
-            <>
-              <button onClick={() => handleNavigate('/usuarios')} className="block w-full text-left">
-                Usuarios
+            {user ? (
+              <button 
+                onClick={onLogout} 
+                className="block w-full text-left bg-white/20 hover:bg-white/30 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200 mt-2"
+              >
+                Cerrar sesión
               </button>
-              <button onClick={() => handleNavigate('/reportes')} className="block w-full text-left">
-                Reportes
+            ) : (
+              <button 
+                onClick={() => handleNavigate('/login')} 
+                className="block w-full text-left bg-yellow-500 hover:bg-yellow-600 text-red-800 font-medium py-3 px-4 rounded-lg transition-colors duration-200 mt-2"
+              >
+                Iniciar sesión
               </button>
-              <button onClick={() => handleNavigate('/logs')} className="block w-full text-left">
-                Logs
-              </button>
-            </>
-          )}
-          {user ? (
-            <button onClick={onLogout} className="block w-full text-left">
-              Cerrar sesión
-            </button>
-          ) : (
-            <button onClick={() => handleNavigate('/login')} className="block w-full text-left">
-              Iniciar sesión
-            </button>
-          )}
-        </nav>
+            )}
+          </nav>
+        </div>
       )}
     </header>
   );

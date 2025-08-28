@@ -156,6 +156,63 @@ router.patch("/:id/review", async (req, res) => {
   }
 });
 
+  // 📌 Confirmar pesos exactos del carnicero y marcar como listo
+  router.patch("/:id/confirm-weights", async (req, res) => {
+    try {
+      const q = req.params.id;
+      const updatedItems = req.body.items;
+
+      if (!Array.isArray(updatedItems) || !updatedItems.length) {
+        return res.status(400).json({ error: "Items inválidos" });
+      }
+
+      // recalcular total con pesos exactos
+      const newTotal = updatedItems.reduce(
+        (sum, it) => sum + (it.price || 0) * (it.quantity || 0),
+        0
+      );
+
+      let order = await Order.findOneAndUpdate(
+        { id: q },
+        { 
+          items: updatedItems, 
+          totalCLP: newTotal, 
+          reviewed: true,
+          status: "Listo" // Marcar automáticamente como listo
+        },
+        { new: true }
+      );
+      if (!order && q.match(/^[0-9a-fA-F]{24}$/)) {
+        order = await Order.findByIdAndUpdate(
+          q,
+          { 
+            items: updatedItems, 
+            totalCLP: newTotal, 
+            reviewed: true,
+            status: "Listo"
+          },
+          { new: true }
+        );
+      }
+
+      if (!order) return res.status(404).json({ error: "Pedido no encontrado" });
+
+      // Emitir eventos específicos para actualizaciones del carnicero
+      io.emit("orders:updated", order);
+      io.emit("butcher:order:updated", {
+        orderId: order.id,
+        items: updatedItems,
+        newTotal: newTotal,
+        status: "Listo"
+      });
+
+      res.json(order);
+    } catch (err) {
+      console.error("❌ Error PATCH /orders/:id/confirm-weights:", err);
+      res.status(400).json({ error: "No se pudo confirmar los pesos" });
+    }
+  });
+
   // 📌 Actualizar estado
   router.patch("/:id/status", async (req, res) => {
     try {

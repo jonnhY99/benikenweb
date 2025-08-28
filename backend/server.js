@@ -12,6 +12,7 @@ import authRouter from './routes/auth.js';
 import logsRouter from './routes/logs.js';
 import notificationsRouter from './routes/notifications.js';
 import usersRouter from './routes/users.js'; // 👈 importar rutas de usuarios
+import reviewsRouter from './routes/reviews.js';
 import { verifyToken, requireRole } from './middleware/auth.js';
 
 const app = express();
@@ -53,6 +54,9 @@ app.use('/api/orders', ordersRouterFactory(io));
 
 // ===== Usuarios (solo admin puede listar/gestionar) =====
 app.use('/api/users', usersRouter); // 👈 aquí montamos las rutas de usuarios
+
+// ===== Reviews (reseñas de clientes) =====
+app.use('/api/reviews', reviewsRouter);
 
 // ===== Notificaciones y logs (protegidas) =====
 app.use('/api/notifications', verifyToken, notificationsRouter);

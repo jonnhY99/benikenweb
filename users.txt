@@ -10,7 +10,7 @@
     role: 'carniceria'
   },
   {
-    name: 'Cliente Juan',
-    email: 'juan@beniken.com',
-    password: 'juan123',
+    name: 'Cliente Axel',
+    email: 'Axel@beniken.com',
+    password: 'axel123',
     role: 'cliente'

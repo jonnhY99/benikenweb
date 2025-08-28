@@ -54,8 +54,24 @@ export async function deleteOrder(id) {
   return true;
 }
 
-// 📌 🔹 Nueva: Ajustar pedido (review)
+// 📌 Ajustar pedido (review)
 export async function updateOrderReview(id, items) {
-  const { data } = await axios.patch(`${API_URL}/${id}/review`, { items });
-  return data;
+  const res = await fetch(`${BASE}/api/orders/${id}/review`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  });
+  if (!res.ok) throw new Error('Error al ajustar pedido');
+  return res.json();
+}
+
+// 📌 Confirmar pesos exactos del carnicero y marcar como listo
+export async function confirmOrderWeights(id, items) {
+  const res = await fetch(`${BASE}/api/orders/${id}/confirm-weights`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  });
+  if (!res.ok) throw new Error('Error al confirmar pesos');
+  return res.json();
 }

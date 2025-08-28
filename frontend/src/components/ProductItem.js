@@ -6,11 +6,20 @@ const formatCLP = (value) => {
 };
 
 const ProductItem = ({ product, onAddToCart }) => {
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(0.5); // Default 0.5 kg
+  
+  // Calculate estimated price
+  const estimatedPrice = quantity * product.price;
+  
+  const handleQuantityChange = (e) => {
+    const value = parseFloat(e.target.value) || 0;
+    setQuantity(Math.max(0, value)); // Ensure non-negative
+  };
 
   const handleAdd = () => {
     if (quantity > 0) {
-      onAddToCart(product, quantity);
+      // Pass product with quantity and estimated price
+      onAddToCart(product, quantity, estimatedPrice);
     }
   };
 
@@ -33,18 +42,37 @@ const ProductItem = ({ product, onAddToCart }) => {
         </span>
         <span className="text-gray-500 text-sm">Stock: {product.stock}</span>
       </div>
+      
+      {/* Estimated Price Display */}
+      <div className="bg-gray-50 p-3 rounded-lg mb-4">
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-600">Precio estimado:</span>
+          <span className="text-lg font-bold text-green-600">
+            {formatCLP(estimatedPrice)}
+          </span>
+        </div>
+        <div className="text-xs text-gray-500 mt-1">
+          {quantity} {product.unit} × {formatCLP(product.price)}
+        </div>
+      </div>
 
       <div className="flex items-center space-x-3">
-        <input
-          type="number"
-          min="1"
-          value={quantity}
-          onChange={(e) => setQuantity(parseInt(e.target.value || '1', 10))}
-          className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-red-500"
-        />
+        <div className="flex flex-col">
+          <label className="text-xs text-gray-600 mb-1">Cantidad ({product.unit})</label>
+          <input
+            type="number"
+            min="0.1"
+            step="0.1"
+            value={quantity}
+            onChange={handleQuantityChange}
+            className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-red-500"
+            placeholder="0.5"
+          />
+        </div>
         <button
           onClick={handleAdd}
-          className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors"
+          disabled={quantity <= 0}
+          className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
           Agregar al Carrito
         </button>

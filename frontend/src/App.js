@@ -18,6 +18,9 @@ import PayWeb from "./components/payweb";
 import Usuarios from './components/Usuarios.js';
 
 import HeroSection from './components/HeroSection.js';
+import ProductsPreview from './components/ProductsPreview.js';
+import Categories from './components/Categories.js';
+import WhyChooseUs from './components/WhyChooseUs.js';
 import TestimonialsSection from './components/TestimonialsSection.js';
 import GallerySection from './components/GallerySection.js';
 import LayoutFooter from './components/LayoutFooter.js';
@@ -238,38 +241,46 @@ const App = () => {
       <LayoutHeader
         user={user}
         onLogout={handleLogout}
-        cartCount={cart.reduce((acc, i) => acc + i.quantity, 0)}
+        cartCount={cart.length}
       />
 
-      <main className="flex-1 container mx-auto p-6">
+      <main className="flex-1">
         <Routes>
-          <Route path="/" element={<><HeroSection /><TestimonialsSection /><GallerySection /></>} />
-          <Route path="/login" element={<LoginForm onLoginSuccess={(u) => { setUser(u); navigate('/'); }} />} />
+          <Route path="/" element={<><HeroSection /><ProductsPreview products={products} /><Categories /><WhyChooseUs /><div className="container mx-auto p-6"><TestimonialsSection /><GallerySection /></div></>} />
+          <Route path="/login" element={<div className="container mx-auto p-6 pt-24"><LoginForm onLoginSuccess={(u) => { setUser(u); navigate('/'); }} /></div>} />
 
           {/* 🔹 Carrito */}
           <Route path="/cart" element={
-            cart.length === 0 ? (
-              <p className="text-center text-gray-600 text-xl">Tu carrito está vacío. ¡Agrega algo de carnita!</p>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-4">
-                  {cart.map((item) => (
-                    <CartItem
-                      key={item.productId}
-                      item={item}
-                      onUpdateQuantity={handleUpdateCartQuantity}
-                      onRemoveItem={handleRemoveFromCart}
-                    />
-                  ))}
-                </div>
-                <div className="lg:col-span-1">
-                  <OrderSummary cartItems={cart} />
-                  <div className="mt-6">
-                    <CustomerForm onSubmit={handlePlaceOrder} />
+            <div className="container mx-auto p-6 pt-24">
+              {cart.length === 0 ? (
+                <p className="text-center text-gray-600 text-xl">Tu carrito está vacío. ¡Agrega algo de carnita!</p>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  <div className="lg:col-span-2 space-y-4">
+                    {cart.map((item) => (
+                      <CartItem
+                        key={item.productId}
+                        item={item}
+                        onUpdateQuantity={handleUpdateCartQuantity}
+                        onRemoveItem={handleRemoveFromCart}
+                      />
+                    ))}
+                  </div>
+                  <div className="lg:col-span-1">
+                    <OrderSummary cartItems={cart} />
+                    <div className="mt-6">
+                      <CustomerForm 
+                        onSubmit={handlePlaceOrder} 
+                        totalAmount={cart.reduce((acc, item) => {
+                          const precioNumerico = Number(item.price) || 0;
+                          return acc + precioNumerico * item.quantity;
+                        }, 0)}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            )
+              )}
+            </div>
           } />
 
           {/* 🔹 Pago después de revisión */}
@@ -281,14 +292,14 @@ const App = () => {
             />
           } />
 
-          <Route path="/order-status" element={<OrderStatusPage orderId={trackingOrderId} onGoHome={() => navigate('/')} />} />
-          <Route path="/carniceria" element={isButcher || isAdmin ? <ButcherOrdersBoard orders={allOrders} onUpdateStatus={handleUpdateOrderStatus} onDeleteOrder={handleDeleteOrder} isAdmin={isAdmin} /> : <p className="text-center text-red-600">No tienes permisos para ver esta sección.</p>} />
-          <Route path="/admin" element={<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{allOrders.map((order) => (<AdminOrderCard key={order.id} order={order} onUpdateStatus={handleUpdateOrderStatus} />))}</div>} />
-          <Route path="/logs" element={isAdmin ? <AdminLoginLogs /> : <p className="text-center text-red-600">No tienes permisos para ver esta sección.</p>} />
-          <Route path="/reportes" element={isAdmin ? <AdminReports /> : <p className="text-center text-red-600">No tienes permisos para ver esta sección.</p>} />
-          <Route path="/usuarios" element={isAdmin ? <Usuarios /> : <p className="text-center text-red-600">No tienes permisos para ver esta sección.</p>} />
-          <Route path="/productos" element={<ProductList products={products} onAddToCart={handleAddToCart} />} />
-          <Route path="/payweb" element={<PayWeb />} />
+          <Route path="/order-status" element={<div className="container mx-auto p-6 pt-24"><OrderStatusPage orderId={trackingOrderId} onGoHome={() => navigate('/')} /></div>} />
+          <Route path="/carniceria" element={<div className="container mx-auto p-6 pt-24">{isButcher || isAdmin ? <ButcherOrdersBoard orders={allOrders} onUpdateStatus={handleUpdateOrderStatus} onDeleteOrder={handleDeleteOrder} isAdmin={isAdmin} /> : <p className="text-center text-red-600">No tienes permisos para ver esta sección.</p>}</div>} />
+          <Route path="/admin" element={<div className="container mx-auto p-6 pt-24"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{allOrders.map((order) => (<AdminOrderCard key={order.id} order={order} onUpdateStatus={handleUpdateOrderStatus} />))}</div></div>} />
+          <Route path="/logs" element={<div className="container mx-auto p-6 pt-24">{isAdmin ? <AdminLoginLogs /> : <p className="text-center text-red-600">No tienes permisos para ver esta sección.</p>}</div>} />
+          <Route path="/reportes" element={<div className="container mx-auto p-6 pt-24">{isAdmin ? <AdminReports /> : <p className="text-center text-red-600">No tienes permisos para ver esta sección.</p>}</div>} />
+          <Route path="/usuarios" element={<div className="container mx-auto p-6 pt-24">{isAdmin ? <Usuarios /> : <p className="text-center text-red-600">No tienes permisos para ver esta sección.</p>}</div>} />
+          <Route path="/productos" element={<div className="container mx-auto p-6 pt-24"><ProductList products={products} onAddToCart={handleAddToCart} /></div>} />
+          <Route path="/payweb" element={<div className="container mx-auto p-6 pt-24"><PayWeb /></div>} />
         </Routes>
       </main>
 

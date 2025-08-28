@@ -51,18 +51,40 @@ export default function OrderStatusPage({ orderId: propOrderId, onGoHome }) {
     load();
   }, [orderId]);
 
-  // escuchar actualizaciones por socket
+  // escuchar actualizaciones por socket (incluyendo cambios de precio del carnicero)
   useEffect(() => {
     const s = getSocket();
     if (!s) return;
+    
     const onUpdated = (updated) => {
       if (updated?.id === orderId || updated?._id === orderId) {
+        // Actualizar inmediatamente cuando el carnicero modifica pesos/precios
         setOrder(updated);
+        // Reiniciar contador si hay cambios
+        setSeconds(15);
       }
     };
+    
+    // Escuchar eventos específicos del carnicero
+    const onButcherUpdate = (data) => {
+      if (data?.orderId === orderId) {
+        // Actualizar orden con nuevos precios/pesos
+        setOrder(prev => ({
+          ...prev,
+          items: data.items || prev.items,
+          totalCLP: data.newTotal || prev.totalCLP,
+          status: data.status || prev.status
+        }));
+        setSeconds(15); // Reiniciar contador
+      }
+    };
+    
     s.on('orders:updated', onUpdated);
+    s.on('butcher:order:updated', onButcherUpdate);
+    
     return () => {
       s.off('orders:updated', onUpdated);
+      s.off('butcher:order:updated', onButcherUpdate);
     };
   }, [orderId]);
 
@@ -179,7 +201,7 @@ export default function OrderStatusPage({ orderId: propOrderId, onGoHome }) {
             <ul className="list-disc list-inside text-gray-700 space-y-1">
               {order.items?.map((it, idx) => (
                 <li key={idx}>
-                  {it.name} — {it.quantity} {it.unit || 'kg'} ($
+                  {it.name} — {Number(it.quantity).toFixed(3)} {it.unit || 'kg'} ($
                   {(Number(it.price) || 0).toLocaleString('es-CL')})
                 </li>
               ))}

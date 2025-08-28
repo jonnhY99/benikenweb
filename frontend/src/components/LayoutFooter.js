@@ -1,10 +1,11 @@
 import React from 'react';
+import { Clock } from 'lucide-react';
 
 const LayoutFooter = () => {
   return (
     <footer className="bg-red-700 text-white">
       <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-5">
           {/* Marca */}
           <div className="md:col-span-2">
             <h3 className="text-lg font-semibold">Carnes Beniken</h3>
@@ -12,6 +13,23 @@ const LayoutFooter = () => {
               Tradición, confianza y excelencia al servicio de nuestros clientes. 
                   Ahora también con plataforma en línea para agilizar tus compras..
             </p>
+          </div>
+
+          {/* Schedule */}
+          <div>
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 w-12 h-12 bg-yellow-500/10 rounded-lg flex items-center justify-center">
+                <Clock className="w-6 h-6 text-yellow-500" />
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-1">Horarios</h4>
+                <div className="text-red-100 space-y-1 text-sm">
+                  <p>Lunes a Viernes: 9:00 - 19:00 hrs</p>
+                  <p>Sábado: 9:00 - 18:00 hrs</p>
+                  <p>Domingo: 9:00 - 14:00 hrs</p>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Contacto */}
