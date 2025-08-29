@@ -11,7 +11,7 @@ const ChatBot = () => {
         script.async = true;
         script.addEventListener('load', function() {
           if (window.Landbot) {
-            myLandbot = new window.Landbot.Popup({
+            myLandbot = new window.Landbot.Livechat({
               configUrl: 'https://storage.googleapis.com/landbot.online/v3/H-3111571-CL94004SD21Z9YK3/index.json',
             });
           }
@@ -33,7 +33,7 @@ const ChatBot = () => {
     };
   }, []);
 
-  // No renderiza nada visible, el chatbot es un popup
+  // No renderiza nada visible, el chatbot es un livechat
   return null;
 };
 
