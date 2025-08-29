@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
+import { AuthContext } from '../context/AuthContext';
 
 const formatCLP = (value) => {
   // 6298 => "$6.298"
   return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
 };
 
-const ProductItem = ({ product, onAddToCart }) => {
+const ProductItem = ({ product, onAddToCart, onEditProduct }) => {
+  const { user } = useContext(AuthContext);
   const [quantity, setQuantity] = useState(0.5); // Default 0.5 kg
   
   // Calculate estimated price
@@ -40,7 +42,7 @@ const ProductItem = ({ product, onAddToCart }) => {
         <span className="text-red-600 font-bold text-xl">
           {formatCLP(product.price)}/{product.unit}
         </span>
-        <span className="text-gray-500 text-sm">Stock: {product.stock}</span>
+        <span className="text-gray-500 text-sm">Stock: {Math.round(product.stock || 0)}</span>
       </div>
       
       {/* Estimated Price Display */}
@@ -77,6 +79,18 @@ const ProductItem = ({ product, onAddToCart }) => {
           Agregar al Carrito
         </button>
       </div>
+
+      {/* Admin Edit Button */}
+      {user && user.role === 'admin' && onEditProduct && (
+        <div className="mt-3">
+          <button
+            onClick={() => onEditProduct(product)}
+            className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+          >
+            Editar Producto
+          </button>
+        </div>
+      )}
     </div>
   );
 };

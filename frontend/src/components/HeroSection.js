@@ -37,7 +37,7 @@ const HeroSection = () => {
       </div>
       
       {/* Logo */}
-      <div className="absolute top-20 right-6 md:top-24 md:right-8 lg:top-28 lg:right-12 z-20">
+      <div className="absolute top-20 left-1/2 transform translate-x-2 md:top-24 md:translate-x-4 lg:top-28 lg:translate-x-8 xl:translate-x-12 z-20">
         <img
           src="image/logo_listo.png"
           alt="Carnes Beniken Logo"

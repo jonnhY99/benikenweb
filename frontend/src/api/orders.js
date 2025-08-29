@@ -38,12 +38,24 @@ export async function updateOrderStatus(id, status) {
 }
 
 // 📌 Marcar un pedido como pagado
-export async function payOrder(id) {
+export async function payOrder(id, paymentMethod = 'local') {
   const res = await fetch(`${BASE}/api/orders/${id}/pay`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paymentMethod }),
   });
   if (!res.ok) throw new Error('Error al marcar pedido como pagado');
+  return res.json();
+}
+
+// 📌 Marcar método de pago sin confirmar pago (para pago en tienda)
+export async function setPaymentMethod(id, paymentMethod) {
+  const res = await fetch(`${BASE}/api/orders/${id}/payment-method`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paymentMethod }),
+  });
+  if (!res.ok) throw new Error('Error al establecer método de pago');
   return res.json();
 }
 

@@ -1,10 +1,40 @@
 // backend/routes/orders.js
 import express from "express";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
 
 export default function ordersRouterFactory(io) {
   const router = express.Router();
+
+  // Configurar multer para subida de archivos
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      const uploadDir = 'uploads/receipts';
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      cb(null, `receipt-${req.params.id}-${uniqueSuffix}${path.extname(file.originalname)}`);
+    }
+  });
+
+  const upload = multer({ 
+    storage: storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Solo se permiten archivos de imagen'));
+      }
+    }
+  });
 
   // ─── Generar el próximo id de pedido (ORD001, ORD002, etc.)
   async function getNextOrderId() {
@@ -242,7 +272,12 @@ router.patch("/:id/review", async (req, res) => {
 router.patch("/:id/pay", async (req, res) => {
   try {
     const q = req.params.id;
-    const update = { paid: true, paymentDate: new Date() };
+    const { paymentMethod = 'local' } = req.body;
+    const update = { 
+      paid: true, 
+      paymentMethod,
+      paymentDate: new Date() 
+    };
 
     let order = await Order.findOneAndUpdate({ id: q }, update, { new: true });
     if (!order && q.match(/^[0-9a-fA-F]{24}$/)) {
@@ -256,6 +291,28 @@ router.patch("/:id/pay", async (req, res) => {
   } catch (err) {
     console.error("❌ Error PATCH /orders/:id/pay:", err);
     res.status(400).json({ error: "No se pudo marcar el pedido como pagado" });
+  }
+});
+
+// 📌 Establecer método de pago sin marcar como pagado (para pago en tienda)
+router.patch("/:id/payment-method", async (req, res) => {
+  try {
+    const q = req.params.id;
+    const { paymentMethod } = req.body;
+    const update = { paymentMethod };
+
+    let order = await Order.findOneAndUpdate({ id: q }, update, { new: true });
+    if (!order && q.match(/^[0-9a-fA-F]{24}$/)) {
+      order = await Order.findByIdAndUpdate(q, update, { new: true });
+    }
+
+    if (!order) return res.status(404).json({ error: "Pedido no encontrado" });
+
+    io.emit("orders:updated", order);
+    res.json(order);
+  } catch (err) {
+    console.error("❌ Error PATCH /orders/:id/payment-method:", err);
+    res.status(400).json({ error: "No se pudo establecer el método de pago" });
   }
 });
 
@@ -293,6 +350,186 @@ router.patch("/:id/pay", async (req, res) => {
       res.status(400).json({ error: "No se pudo eliminar el pedido" });
     }
   });
+
+// 📌 Subir comprobante de transferencia
+router.post("/:id/upload-receipt", upload.single('receipt'), async (req, res) => {
+  try {
+    const q = req.params.id;
+    const { customerName, totalAmount } = req.body;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: "No se subió ningún archivo" });
+    }
+
+    // Buscar el pedido
+    let order = await Order.findOne({ id: q });
+    if (!order && q.match(/^[0-9a-fA-F]{24}$/)) {
+      order = await Order.findById(q);
+    }
+
+    if (!order) {
+      // Eliminar archivo si no se encuentra el pedido
+      fs.unlinkSync(req.file.path);
+      return res.status(404).json({ error: "Pedido no encontrado" });
+    }
+
+    // Validaciones básicas
+    const expectedAmount = order.totalCLP;
+    const uploadedAmount = parseFloat(totalAmount);
+    
+    // Actualizar pedido con información del comprobante
+    const receiptData = {
+      receiptPath: req.file.path,
+      receiptFilename: req.file.filename,
+      uploadedAt: new Date(),
+      customerName: customerName,
+      reportedAmount: uploadedAmount,
+      validationStatus: 'pending', // pending, approved, rejected
+      paymentMethod: 'online'
+    };
+
+    order = await Order.findOneAndUpdate(
+      { id: q },
+      { 
+        receiptData,
+        paymentMethod: 'online'
+      },
+      { new: true }
+    );
+
+    if (!order && q.match(/^[0-9a-fA-F]{24}$/)) {
+      order = await Order.findByIdAndUpdate(
+        q,
+        { 
+          receiptData,
+          paymentMethod: 'online'
+        },
+        { new: true }
+      );
+    }
+
+    // Emitir evento para notificar al carnicero
+    io.emit("receipt:uploaded", {
+      orderId: order.id,
+      customerName: order.customerName,
+      amount: expectedAmount,
+      reportedAmount: uploadedAmount,
+      receiptFilename: req.file.filename
+    });
+
+    io.emit("orders:updated", order);
+
+    res.json({ 
+      message: "Comprobante subido exitosamente",
+      order: order
+    });
+  } catch (err) {
+    console.error("❌ Error POST /orders/:id/upload-receipt:", err);
+    // Eliminar archivo en caso de error
+    if (req.file) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (unlinkErr) {
+        console.error("Error eliminando archivo:", unlinkErr);
+      }
+    }
+    res.status(400).json({ error: "No se pudo subir el comprobante" });
+  }
+});
+
+// 📌 Validar comprobante de transferencia (carnicero)
+router.patch("/:id/validate-receipt", async (req, res) => {
+  try {
+    const q = req.params.id;
+    const { approved, notes } = req.body;
+    
+    let order = await Order.findOne({ id: q });
+    if (!order && q.match(/^[0-9a-fA-F]{24}$/)) {
+      order = await Order.findById(q);
+    }
+
+    if (!order) {
+      return res.status(404).json({ error: "Pedido no encontrado" });
+    }
+
+    if (!order.receiptData) {
+      return res.status(400).json({ error: "No hay comprobante para validar" });
+    }
+
+    const update = {
+      'receiptData.validationStatus': approved ? 'approved' : 'rejected',
+      'receiptData.validatedAt': new Date(),
+      'receiptData.validationNotes': notes || ''
+    };
+
+    // Si se aprueba, marcar como pagado
+    if (approved) {
+      update.paid = true;
+      update.paymentDate = new Date();
+    }
+
+    order = await Order.findOneAndUpdate(
+      { id: q },
+      update,
+      { new: true }
+    );
+
+    if (!order && q.match(/^[0-9a-fA-F]{24}$/)) {
+      order = await Order.findByIdAndUpdate(
+        q,
+        update,
+        { new: true }
+      );
+    }
+
+    // Emitir eventos
+    io.emit("receipt:validated", {
+      orderId: order.id,
+      approved: approved,
+      customerName: order.customerName
+    });
+
+    io.emit("orders:updated", order);
+
+    res.json(order);
+  } catch (err) {
+    console.error("❌ Error PATCH /orders/:id/validate-receipt:", err);
+    res.status(400).json({ error: "No se pudo validar el comprobante" });
+  }
+});
+
+// 📌 Ver comprobante de transferencia (carnicero)
+router.get("/:id/receipt", async (req, res) => {
+  try {
+    const q = req.params.id;
+    
+    let order = await Order.findOne({ id: q });
+    if (!order && q.match(/^[0-9a-fA-F]{24}$/)) {
+      order = await Order.findById(q);
+    }
+
+    if (!order) {
+      return res.status(404).json({ error: "Pedido no encontrado" });
+    }
+
+    if (!order.receiptData || !order.receiptData.receiptPath) {
+      return res.status(404).json({ error: "No hay comprobante disponible" });
+    }
+
+    const receiptPath = order.receiptData.receiptPath;
+    
+    // Verificar que el archivo existe
+    if (!fs.existsSync(receiptPath)) {
+      return res.status(404).json({ error: "Archivo de comprobante no encontrado" });
+    }
+
+    // Enviar el archivo
+    res.sendFile(path.resolve(receiptPath));
+  } catch (err) {
+    console.error("❌ Error GET /orders/:id/receipt:", err);
+    res.status(500).json({ error: "Error al obtener el comprobante" });
+  }
+});
 
   return router;
 }

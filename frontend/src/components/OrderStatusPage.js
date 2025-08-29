@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { getSocket } from '../utils/socket';
 import { fetchOrderById } from '../api/orders';
 import { useNavigate } from 'react-router-dom';
+import OrderQRCode from './OrderQRCode';
 
 const StatusBadge = ({ status }) => {
   const color =
@@ -28,6 +29,7 @@ export default function OrderStatusPage({ orderId: propOrderId, onGoHome }) {
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
   const [seconds, setSeconds] = useState(15); // ⏳ contador para refrescar
+  const [showQR, setShowQR] = useState(false);
 
   const load = async () => {
     if (!orderId) {
@@ -114,17 +116,34 @@ export default function OrderStatusPage({ orderId: propOrderId, onGoHome }) {
 
   const prettyMsg = useMemo(() => {
     const st = order?.status || 'Pendiente';
-    if (st === 'Listo') return '¡Tu pedido está listo para retiro!';
+    if (st === 'Listo') {
+      if (order?.paid) {
+        return '¡Tu pedido está listo para retiro! Usa el código QR para retirar tu pedido.';
+      } else if (order?.paymentMethod === 'local') {
+        return '¡Tu pedido está listo para retiro! Recuerda llevar el dinero para pagar en la tienda.';
+      } else if (order?.receiptData?.validationStatus === 'pending') {
+        return 'Tu pedido está listo, pero estamos validando tu comprobante de transferencia.';
+      } else if (order?.receiptData?.validationStatus === 'rejected') {
+        return 'Tu pedido está listo, pero necesitas subir un nuevo comprobante de transferencia.';
+      }
+      return '¡Tu pedido está listo! Completa el pago para poder retirarlo.';
+    }
     if (st === 'Entregado') return 'Pedido entregado. ¡Gracias por tu compra!';
+    
+    // Durante la preparación NO mostrar mensajes de validación
+    // Los mensajes de validación solo aparecen cuando el pedido está 'Listo'
+    
+    // Mensaje por defecto durante preparación
     return 'Tu pedido está en preparación, la carnicería está ajustando los montos según el peso real, esto puede variar entre más o menos gramos.';
-  }, [order?.status]);
+  }, [order?.status, order?.paymentMethod, order?.paid, order?.receiptData]);
 
   const totalCLP = useMemo(() => {
     if (!order?.items?.length) return 0;
-    return order.items.reduce(
+    const total = order.items.reduce(
       (acc, it) => acc + (Number(it.price) || 0) * it.quantity,
       0
     );
+    return Math.round(total);
   }, [order?.items]);
 
   return (
@@ -151,10 +170,34 @@ export default function OrderStatusPage({ orderId: propOrderId, onGoHome }) {
                 {order.paymentDate
                   ? new Date(order.paymentDate).toLocaleString()
                   : 'fecha desconocida'}
+                {order.paymentMethod && (
+                  <span className="block text-sm mt-1">
+                    Método: {order.paymentMethod === 'local' ? 'Pago en tienda' : 'Pago online'}
+                  </span>
+                )}
+              </div>
+            ) : (order.receiptData && order.receiptData.validationStatus === 'pending' && order.status === 'Listo' && order.receiptData.uploadedAt) ? (
+              <div className="bg-blue-100 text-blue-800 p-3 rounded mb-4 text-center font-semibold">
+                🔍 Comprobante en validación
+                <span className="block text-sm mt-1">
+                  📄 Tu comprobante de transferencia está siendo revisado por la carnicería. Te notificaremos cuando sea validado.
+                </span>
+              </div>
+            ) : (order.receiptData && order.receiptData.validationStatus === 'rejected' && order.status === 'Listo' && order.receiptData.uploadedAt) ? (
+              <div className="bg-red-100 text-red-800 p-3 rounded mb-4 text-center font-semibold">
+                ❌ Transferencia rechazada
+                <span className="block text-sm mt-1">
+                  {order.receiptData.validationNotes || 'Contacta con la carnicería para más información'}
+                </span>
               </div>
             ) : (
               <div className="bg-yellow-100 text-yellow-800 p-3 rounded mb-4 text-center font-semibold">
                 ⚠️ Pago pendiente
+                {order.paymentMethod === 'local' && (
+                  <span className="block text-sm mt-1">
+                    💳 Recuerda pagar al momento del retiro en la tienda
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -214,13 +257,40 @@ export default function OrderStatusPage({ orderId: propOrderId, onGoHome }) {
 
           {/* Botones */}
           <div className="flex justify-center gap-3">
-            {order.status === 'Listo' && !order.paid && (
+            {/* Mostrar QR cuando esté listo y pagado */}
+            {order.status === 'Listo' && order.paid && (
               <button
-                className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700"
-                onClick={() => navigate(`/payment/${order.id}`)}
+                className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2"
+                onClick={() => setShowQR(true)}
               >
-                Ir a Pagar
+                📱 Ver QR para retiro
               </button>
+            )}
+            
+            {/* Botones de pago cuando está listo pero no pagado */}
+            {order.status === 'Listo' && !order.paid && (
+              order.paymentMethod === 'local' ? (
+                <button
+                  className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2"
+                  onClick={() => setShowQR(true)}
+                >
+                  📱 Ver QR para retiro
+                </button>
+              ) : (order.receiptData && order.receiptData.validationStatus === 'rejected') ? (
+                <button
+                  className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700"
+                  onClick={() => navigate(`/payment/${order.id}`)}
+                >
+                  Subir nuevo comprobante
+                </button>
+              ) : (
+                <button
+                  className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700"
+                  onClick={() => navigate(`/payment/${order.id}`)}
+                >
+                  Ir a Pagar
+                </button>
+              )
             )}
             <button
               className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300"
@@ -238,6 +308,14 @@ export default function OrderStatusPage({ orderId: propOrderId, onGoHome }) {
             </button>
           </div>
         </>
+      )}
+      
+      {/* QR Modal */}
+      {showQR && order && (
+        <OrderQRCode 
+          order={order} 
+          onClose={() => setShowQR(false)} 
+        />
       )}
     </div>
   );

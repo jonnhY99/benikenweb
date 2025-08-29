@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import OrderReviewModal from "./OrderReviewModal"; // 👈 Importar modal
-import { confirmOrderWeights } from "../api/orders"; // 👈 Importar API function
+import QRScanner from "./QRScanner"; // 👈 Importar escáner QR
+import { confirmOrderWeights, payOrder } from "../api/orders"; // 👈 Importar API function
 
 const toCLP = (n) =>
   (n ?? 0).toLocaleString("es-CL", {
@@ -144,6 +145,33 @@ function OrderCard({ order, onUpdate, onDelete }) {
         <div>
           <strong>Total:</strong> {toCLP(total)}
         </div>
+        <div className="flex items-center gap-2">
+          <strong>Pago:</strong>
+          <span
+            className={`text-xs px-2 py-1 rounded font-medium ${
+              order.paid
+                ? "bg-green-100 text-green-800"
+                : (order.receiptData && order.receiptData.validationStatus === 'pending')
+                ? "bg-yellow-100 text-yellow-800"
+                : (order.receiptData && order.receiptData.validationStatus === 'rejected')
+                ? "bg-red-100 text-red-800"
+                : "bg-red-100 text-red-800"
+            }`}
+          >
+            {order.paid 
+              ? "PAGADO" 
+              : (order.receiptData && order.receiptData.validationStatus === 'pending')
+              ? "PENDIENTE VALIDACIÓN"
+              : (order.receiptData && order.receiptData.validationStatus === 'rejected')
+              ? "TRANSFERENCIA RECHAZADA"
+              : "NO PAGADO"}
+          </span>
+          {order.paymentMethod && (
+            <span className="text-xs text-gray-500">
+              ({order.paymentMethod === 'local' ? 'En tienda' : 'Online'})
+            </span>
+          )}
+        </div>
       </div>
 
       <ul className="text-sm text-gray-700 mt-2 list-disc ml-5">
@@ -153,6 +181,32 @@ function OrderCard({ order, onUpdate, onDelete }) {
           </li>
         ))}
       </ul>
+      
+      {/* Información del comprobante si existe */}
+      {order.receiptData && (
+        <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="text-sm">
+            <div className="font-semibold text-blue-800 mb-1">📄 Comprobante de Transferencia</div>
+            <div className="space-y-1 text-blue-700">
+              <div><strong>Subido:</strong> {new Date(order.receiptData.uploadedAt).toLocaleString()}</div>
+              <div><strong>Monto reportado:</strong> ${order.receiptData.reportedAmount?.toLocaleString('es-CL')}</div>
+              <div><strong>Estado:</strong> 
+                <span className={`ml-1 px-2 py-1 rounded text-xs ${
+                  order.receiptData.validationStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                  order.receiptData.validationStatus === 'approved' ? 'bg-green-100 text-green-800' :
+                  'bg-red-100 text-red-800'
+                }`}>
+                  {order.receiptData.validationStatus === 'pending' ? 'Pendiente' :
+                   order.receiptData.validationStatus === 'approved' ? 'Aprobado' : 'Rechazado'}
+                </span>
+              </div>
+              {order.receiptData.validationNotes && (
+                <div><strong>Notas:</strong> {order.receiptData.validationNotes}</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2 mt-3">
         {(status === "Pendiente" || status === "En preparación") && (
@@ -165,17 +219,95 @@ function OrderCard({ order, onUpdate, onDelete }) {
         )}
         {status === "Listo" && (
           <>
+            {/* Botones de pago según el estado */}
+            {!order.paid && (
+              <>
+                {/* Si hay comprobante pendiente de validación */}
+                {(order.receiptData && order.receiptData.validationStatus === 'pending') && (
+                  <>
+                    <button
+                      className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
+                      onClick={() => {
+                        const receiptUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/orders/${order.id}/receipt`;
+                        window.open(receiptUrl, '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
+                      }}
+                    >
+                      👁️ Ver Comprobante
+                    </button>
+                    <button
+                      className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700"
+                      onClick={async () => {
+                        try {
+                          const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/orders/${order.id}/validate-receipt`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ approved: true })
+                          });
+                          if (!response.ok) throw new Error('Error al validar');
+                          alert('¡Transferencia validada!');
+                        } catch (err) {
+                          alert('Error al validar transferencia: ' + err.message);
+                        }
+                      }}
+                    >
+                      ✅ Validar Transferencia
+                    </button>
+                    <button
+                      className="px-3 py-1 rounded bg-red-600 text-white hover:bg-red-700"
+                      onClick={async () => {
+                        const notes = prompt('Motivo del rechazo (opcional):');
+                        try {
+                          const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/orders/${order.id}/validate-receipt`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ approved: false, notes })
+                          });
+                          if (!response.ok) throw new Error('Error al rechazar');
+                          alert('Transferencia rechazada');
+                        } catch (err) {
+                          alert('Error al rechazar transferencia: ' + err.message);
+                        }
+                      }}
+                    >
+                      ❌ Rechazar
+                    </button>
+                  </>
+                )}
+                
+                {/* Si no hay comprobante o es pago local */}
+                {(!order.receiptData || order.paymentMethod === 'local') && (
+                  <button
+                    className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700"
+                    onClick={async () => {
+                      try {
+                        await payOrder(order.id, order.paymentMethod || 'local');
+                        // El socket actualizará automáticamente la UI
+                      } catch (err) {
+                        alert('Error al marcar como pagado: ' + err.message);
+                      }
+                    }}
+                  >
+                    💰 Marcar PAGADO
+                  </button>
+                )}
+              </>
+            )}
+            
+            {/* Botón para marcar como entregado (solo si está pagado) */}
+            {order.paid && (
+              <button
+                className="px-3 py-1 rounded bg-purple-600 text-white hover:bg-purple-700"
+                onClick={() => onUpdate(order.id, "Entregado")}
+              >
+                📦 Marcar ENTREGADO
+              </button>
+            )}
+            
             <button
               className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
               onClick={() => onUpdate(order.id, "Pendiente")}
             >
-              Volver a En preparación
-            </button>
-            <button
-              className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700"
-              onClick={() => onUpdate(order.id, "Entregado")}
-            >
-              Marcar ENTREGADO
+              ⬅️ Volver a preparación
             </button>
           </>
         )}
@@ -192,7 +324,7 @@ function OrderCard({ order, onUpdate, onDelete }) {
             aria-label={`Eliminar pedido ${order.id}`}
             title="Eliminar pedido"
           >
-            Eliminar
+            🗑️ Eliminar
           </button>
         )}
       </div>
@@ -227,6 +359,7 @@ export default function ButcherOrdersBoard({
   const [hourBucket, setHourBucket] = useState("all");
   const [dateStart, setDateStart] = useState("");
   const [dateEnd, setDateEnd] = useState("");
+  const [showQRScanner, setShowQRScanner] = useState(false);
 
   const q = norm(query.trim());
 
@@ -283,7 +416,15 @@ export default function ButcherOrdersBoard({
       {/* Barra superior */}
       <div className="flex flex-col gap-3 mb-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <h2 className="text-3xl font-bold">Panel de Pedidos — Carnicería</h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-3xl font-bold">Panel de Pedidos — Carnicería</h2>
+            <button
+              onClick={() => setShowQRScanner(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            >
+              📱 Leer QR
+            </button>
+          </div>
 
           {/* Buscador */}
           <div className="flex-1 md:max-w-xl">
@@ -474,6 +615,17 @@ export default function ButcherOrdersBoard({
         * Usa el buscador y los filtros para encontrar pedidos; puedes{" "}
         <strong>eliminar</strong> pedidos rechazados desde los botones rojos.
       </p>
+      
+      {/* QR Scanner Modal */}
+      {showQRScanner && (
+        <QRScanner 
+          onClose={() => setShowQRScanner(false)}
+          onOrderFound={(orderData) => {
+            // Opcional: filtrar automáticamente por el pedido encontrado
+            setQuery(orderData.id);
+          }}
+        />
+      )}
     </section>
   );
 }

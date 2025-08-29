@@ -111,6 +111,7 @@ const LayoutHeader = ({ user, onLogout, cartCount }) => {
               </>
             )}
             
+            
             {/* Botón de llamar con diseño moderno */}
             <a
               href="https://wa.me/56912345678"
@@ -208,6 +209,7 @@ const LayoutHeader = ({ user, onLogout, cartCount }) => {
                 </button>
               </>
             )}
+            
             
             {/* Botón de llamar en móvil */}
             <a

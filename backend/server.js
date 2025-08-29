@@ -13,6 +13,7 @@ import logsRouter from './routes/logs.js';
 import notificationsRouter from './routes/notifications.js';
 import usersRouter from './routes/users.js'; // 👈 importar rutas de usuarios
 import reviewsRouter from './routes/reviews.js';
+import analyticsRouterFactory from './routes/analytics.js';
 import { verifyToken, requireRole } from './middleware/auth.js';
 
 const app = express();
@@ -57,6 +58,9 @@ app.use('/api/users', usersRouter); // 👈 aquí montamos las rutas de usuarios
 
 // ===== Reviews (reseñas de clientes) =====
 app.use('/api/reviews', reviewsRouter);
+
+// ===== Analytics (protegidas solo con token) =====
+app.use('/api/analytics', verifyToken, analyticsRouterFactory(io));
 
 // ===== Notificaciones y logs (protegidas) =====
 app.use('/api/notifications', verifyToken, notificationsRouter);

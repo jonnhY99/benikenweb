@@ -1,122 +1,231 @@
 // src/components/payweb.js
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { payOrder } from "../api/orders"; // ✅ Importamos la API
+import { fetchOrderById } from "../api/orders";
 
 const PayWeb = () => {
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiryDate, setExpiryDate] = useState("");
+  const [order, setOrder] = useState(null);
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploaded, setUploaded] = useState(false);
   const navigate = useNavigate();
 
-  // 👉 Formatear número de tarjeta (XXXX XXXX XXXX XXXX)
-  const handleCardNumber = (e) => {
-    let value = e.target.value.replace(/\D/g, "").substring(0, 16);
-    let formatted = value.replace(/(.{4})/g, "$1 ").trim();
-    setCardNumber(formatted);
-  };
+  // Cargar datos del pedido
+  useEffect(() => {
+    const loadOrder = async () => {
+      const orderId = localStorage.getItem("trackingOrderId");
+      if (orderId) {
+        try {
+          const orderData = await fetchOrderById(orderId);
+          setOrder(orderData);
+        } catch (err) {
+          console.error("Error cargando pedido:", err);
+        }
+      }
+    };
+    loadOrder();
+  }, []);
 
-  // 👉 Formatear fecha MM/YY
-  const handleExpiryDate = (e) => {
-    let value = e.target.value.replace(/\D/g, "").substring(0, 4);
-    if (value.length > 2) {
-      value = value.substring(0, 2) + "/" + value.substring(2);
+  // Manejar selección de archivo
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validar que sea una imagen
+      if (!file.type.startsWith('image/')) {
+        alert('Por favor selecciona una imagen válida');
+        return;
+      }
+      // Validar tamaño (máximo 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('El archivo es muy grande. Máximo 5MB.');
+        return;
+      }
+      setReceiptFile(file);
     }
-    setExpiryDate(value);
   };
 
-  // 👉 Simulación de pago
-  const handleContinue = async () => {
-    if (!cardNumber || !expiryDate) {
-      alert("Por favor ingresa los datos de la tarjeta.");
+  // Subir comprobante de transferencia
+  const handleUploadReceipt = async () => {
+    if (!receiptFile) {
+      alert("Por favor selecciona un comprobante de transferencia.");
       return;
     }
 
+    if (!order) {
+      alert("No se encontró información del pedido.");
+      return;
+    }
+
+    setUploading(true);
+    
     try {
-      const orderId = localStorage.getItem("trackingOrderId");
-      if (!orderId) {
-        alert("No se encontró un pedido activo.");
-        return;
+      const formData = new FormData();
+      formData.append('receipt', receiptFile);
+      formData.append('orderId', order.id);
+      formData.append('customerName', order.customerName);
+      formData.append('totalAmount', Math.round(order.totalCLP));
+
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/orders/${order.id}/upload-receipt`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al subir el comprobante');
       }
 
-      // ✅ Marcar el pedido como pagado en la base de datos
-      await payOrder(orderId);
-
-      // ✅ Guardamos el estado de éxito para mostrarlo en OrderStatusPage
-      localStorage.setItem("paymentSuccess", "true");
-
-      // Redirigir al estado del pedido
-      navigate("/order-status");
+      setUploaded(true);
+      alert('¡Comprobante subido exitosamente! Tu pago está en revisión.');
+      
+      // Redirigir al estado del pedido después de 2 segundos
+      setTimeout(() => {
+        navigate("/order-status");
+      }, 2000);
+      
     } catch (err) {
-      console.error("❌ Error procesando el pago:", err);
-      alert("No se pudo procesar el pago. Intenta nuevamente.");
+      console.error("❌ Error subiendo comprobante:", err);
+      alert("No se pudo subir el comprobante. Intenta nuevamente.");
+    } finally {
+      setUploading(false);
     }
   };
+
+  if (!order) {
+    return (
+      <main className="bg-gray-50 flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <p className="text-gray-600">Cargando información del pedido...</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="bg-gray-50 flex justify-center items-start min-h-screen py-10 font-sans">
       <div className="bg-white rounded-xl shadow-lg max-w-4xl w-full p-8 mx-4">
         {/* Encabezado */}
-        <header className="mb-8 flex items-center gap-2">
-          <img
-            src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/f12c976b-deb3-4c07-882d-bcb99d827f86.png"
-            alt="Logo simulado de Webpay"
-            className="h-10 w-auto"
-          />
-          <span className="text-purple-800 font-semibold text-lg">transbank</span>
+        <header className="mb-8 text-center">
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Pago por Transferencia</h1>
+          <p className="text-gray-600">Sube tu comprobante de transferencia</p>
         </header>
 
         <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Columna izquierda */}
+          {/* Columna izquierda - Información del pedido */}
           <section>
-            <h2 className="text-gray-700 font-semibold mb-6">Estás pagando en:</h2>
-            <div className="mb-6">
-              <img
-                src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/fb21fb69-a29e-41f8-b26f-fa8ed6eaebd2.png"
-                alt="Logo Unired"
-                className="h-10 w-auto mb-4"
-              />
-              <p className="text-2xl font-semibold text-gray-900 mb-1">Monto a pagar:</p>
-              <p className="text-3xl font-bold text-gray-900">
-                ${localStorage.getItem("paymentTotal") || "0"}
-              </p>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">Detalles del Pedido</h2>
+            <div className="bg-gray-50 rounded-lg p-6 mb-6">
+              <div className="space-y-3">
+                <div>
+                  <span className="font-semibold text-gray-700">Pedido:</span>
+                  <span className="ml-2 text-lg font-bold text-blue-600">#{order.id}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-700">Cliente:</span>
+                  <span className="ml-2">{order.customerName}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-700">Monto a pagar:</span>
+                  <span className="ml-2 text-2xl font-bold text-red-700">
+                    ${Math.round(order.totalCLP || 0).toLocaleString('es-CL')}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Instrucciones de transferencia */}
+            <div className="bg-blue-50 rounded-lg p-6">
+              <h3 className="font-semibold text-blue-800 mb-3">📋 Instrucciones de Transferencia</h3>
+              <div className="space-y-2 text-sm text-blue-700">
+                <p><strong>Banco:</strong> Banco Estado</p>
+                <p><strong>Tipo de cuenta:</strong> Cuenta Corriente</p>
+                <p><strong>Número:</strong> 12345678-9</p>
+                <p><strong>RUT:</strong> 12.345.678-9</p>
+                <p><strong>Titular:</strong> Carnicería Beniken</p>
+                <p><strong>Email:</strong> pagos@beniken.cl</p>
+              </div>
+              <div className="mt-4 p-3 bg-yellow-100 rounded border-l-4 border-yellow-500">
+                <p className="text-sm text-yellow-800">
+                  <strong>⚠️ Importante:</strong> En el mensaje de la transferencia, 
+                  incluye tu número de pedido: <strong>#{order.id}</strong>
+                </p>
+              </div>
             </div>
           </section>
 
-          {/* Columna derecha */}
+          {/* Columna derecha - Subir comprobante */}
           <section>
-            <h3 className="text-gray-700 font-semibold mb-6">Ingresa los datos de tu tarjeta:</h3>
-            <div className="bg-gray-100 rounded-md p-6 mb-6">
-              <div className="relative max-w-xs mx-auto">
-                <input
-                  type="text"
-                  value={cardNumber}
-                  onChange={handleCardNumber}
-                  maxLength="19"
-                  placeholder="XXXX XXXX XXXX XXXX"
-                  className="w-full rounded-md border border-gray-300 bg-gray-100 text-gray-700 py-3 px-3 focus:border-purple-700 focus:ring focus:ring-purple-300"
-                />
-              </div>
-              <div className="relative max-w-xs mx-auto mt-4">
-                <input
-                  type="text"
-                  value={expiryDate}
-                  onChange={handleExpiryDate}
-                  maxLength="5"
-                  placeholder="MM/YY"
-                  className="w-20 rounded-md border border-gray-300 bg-gray-100 text-gray-700 py-3 px-3 focus:border-purple-700 focus:ring focus:ring-purple-300"
-                />
-              </div>
-            </div>
+            <h3 className="text-xl font-semibold text-gray-800 mb-4">Subir Comprobante</h3>
+            
+            {!uploaded ? (
+              <div className="space-y-6">
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    id="receipt-upload"
+                  />
+                  <label
+                    htmlFor="receipt-upload"
+                    className="cursor-pointer flex flex-col items-center"
+                  >
+                    <div className="text-4xl mb-4">📄</div>
+                    <p className="text-gray-600 mb-2">
+                      {receiptFile ? receiptFile.name : 'Selecciona tu comprobante'}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Formatos: JPG, PNG, PDF (máx. 5MB)
+                    </p>
+                  </label>
+                </div>
 
-            <button
-              type="button"
-              onClick={handleContinue}
-              className="w-full bg-purple-700 hover:bg-purple-800 text-white py-3 rounded-md font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
-            >
-              Continuar
-            </button>
+                {receiptFile && (
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <p className="text-green-800 text-sm">
+                      ✅ Archivo seleccionado: {receiptFile.name}
+                    </p>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleUploadReceipt}
+                  disabled={!receiptFile || uploading}
+                  className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white py-3 rounded-md font-semibold transition-colors"
+                >
+                  {uploading ? 'Subiendo...' : '📤 Subir Comprobante'}
+                </button>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="text-6xl mb-4">✅</div>
+                <h3 className="text-xl font-semibold text-green-800 mb-2">
+                  ¡Comprobante subido exitosamente!
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Tu pago está en revisión. Te notificaremos cuando sea validado.
+                </p>
+                <button
+                  onClick={() => navigate('/order-status')}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Ver estado del pedido
+                </button>
+              </div>
+            )}
           </section>
         </section>
+
+        {/* Botón volver */}
+        <div className="mt-8 text-center">
+          <button
+            onClick={() => navigate(-1)}
+            className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+          >
+            ← Volver
+          </button>
+        </div>
       </div>
     </main>
   );

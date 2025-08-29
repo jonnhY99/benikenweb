@@ -16,6 +16,7 @@ import OrderStatusPage from './components/OrderStatusPage.js';
 import PaymentPage from './components/PaymentPage.js';
 import PayWeb from "./components/payweb";
 import Usuarios from './components/Usuarios.js';
+import ChatBot from './components/ChatBot.js';
 
 import HeroSection from './components/HeroSection.js';
 import ProductsPreview from './components/ProductsPreview.js';
@@ -298,12 +299,15 @@ const App = () => {
           <Route path="/logs" element={<div className="container mx-auto p-6 pt-24">{isAdmin ? <AdminLoginLogs /> : <p className="text-center text-red-600">No tienes permisos para ver esta sección.</p>}</div>} />
           <Route path="/reportes" element={<div className="container mx-auto p-6 pt-24">{isAdmin ? <AdminReports /> : <p className="text-center text-red-600">No tienes permisos para ver esta sección.</p>}</div>} />
           <Route path="/usuarios" element={<div className="container mx-auto p-6 pt-24">{isAdmin ? <Usuarios /> : <p className="text-center text-red-600">No tienes permisos para ver esta sección.</p>}</div>} />
-          <Route path="/productos" element={<div className="container mx-auto p-6 pt-24"><ProductList products={products} onAddToCart={handleAddToCart} /></div>} />
+          <Route path="/productos" element={<div className="container mx-auto p-6 pt-24"><ProductList products={products} onAddToCart={handleAddToCart} onProductsUpdate={() => fetchProducts().then(setProducts)} /></div>} />
           <Route path="/payweb" element={<div className="container mx-auto p-6 pt-24"><PayWeb /></div>} />
         </Routes>
       </main>
 
       <LayoutFooter />
+      
+      {/* Chatbot global popup */}
+      <ChatBot />
     </div>
   );
 };

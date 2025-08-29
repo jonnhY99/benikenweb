@@ -1,16 +1,6 @@
 import User from '../models/User.js';
+import LoginLog from '../models/LoginLog.js';
 import jwt from 'jsonwebtoken';
-import mongoose from 'mongoose';
-
-// Esquema para guardar logs de inicio de sesión
-const loginLogSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  email: { type: String, required: true },
-  timestamp: { type: Date, default: Date.now }
-});
-
-// ✅ Evitar OverwriteModelError
-const LoginLog = mongoose.models.LoginLog || mongoose.model('LoginLog', loginLogSchema);
 
 // =========================
 // Registrar usuario
