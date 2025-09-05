@@ -1,0 +1,16 @@
+   name: 'Administrador',
+    email: 'admin@beniken.com',
+    password: 'admin123',
+    role: 'admin'
+  },
+  {
+    name: 'Carnicería Local',
+    email: 'carniceria@beniken.com',
+    password: 'carniceria123',
+    role: 'carniceria'
+  },
+  {
+    name: 'Cliente Axel',
+    email: 'Axel@beniken.com',
+    password: 'axel123',
+    role: 'cliente'
