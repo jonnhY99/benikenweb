@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import NotificationSettings from './NotificationSettings';
+import PaymentModal from './PaymentModal';
 import { fetchOrderById } from '../api/orders';
 import OrderQRCode from './OrderQRCode';
 
@@ -26,6 +27,7 @@ const OrderTrackingPage = () => {
   const [error, setError] = useState('');
   const [showQR, setShowQR] = useState(false);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   // 📊 Definir etapas de progreso
   const getProgressSteps = () => [
@@ -299,12 +301,35 @@ const OrderTrackingPage = () => {
             <span className="mr-2">💳</span>
             Estado del pago
           </h2>
-          <div className="flex items-center">
-            <div className={`w-4 h-4 rounded-full mr-3 ${
-              order.paid ? 'bg-green-500' : 'bg-yellow-500'
-            }`}></div>
-            <span className="text-gray-700">{getPaymentStatusMessage()}</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className={`w-4 h-4 rounded-full mr-3 ${
+                order.paid ? 'bg-green-500' : 'bg-yellow-500'
+              }`}></div>
+              <span className="text-gray-700">{getPaymentStatusMessage()}</span>
+            </div>
+            
+            {/* Payment button when payment is required */}
+            {!order.paid && order.status === 'Listo' && (
+              <button
+                onClick={() => setShowPaymentModal(true)}
+                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 duration-200"
+              >
+                💳 Ir a Pagar
+              </button>
+            )}
           </div>
+          
+          {/* Payment info message */}
+          {!order.paid && order.status === 'Listo' && (
+            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-green-700">
+                <span className="font-medium">🎉 ¡Tu pedido está listo!</span> 
+                <br />
+                Completa el pago para proceder con el retiro.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* QR Code */}
@@ -360,6 +385,30 @@ const OrderTrackingPage = () => {
           userEmail={order?.customerEmail}
           orderId={order?.orderNumber || order?.id}
           onClose={() => setShowNotificationSettings(false)}
+        />
+      )}
+
+      {/* Modal de pago */}
+      {showPaymentModal && (
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          orderId={order?.id || order?._id}
+          onPaymentComplete={() => {
+            // Recargar datos del pedido después del pago
+            const loadOrder = async () => {
+              try {
+                const response = await fetch(`${process.env.REACT_APP_API_URL}/api/orders/${orderId}`);
+                if (response.ok) {
+                  const updatedOrder = await response.json();
+                  setOrder(updatedOrder);
+                }
+              } catch (err) {
+                console.error('Error recargando pedido:', err);
+              }
+            };
+            loadOrder();
+          }}
         />
       )}
     </div>

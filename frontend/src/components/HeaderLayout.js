@@ -140,17 +140,33 @@ const LayoutHeader = ({ user, onLogout, cartCount }) => {
             )}
           </nav>
 
-          {/* 🔹 Botón hamburguesa moderno en móvil */}
-          <button
-            className="md:hidden p-2 rounded-lg hover:bg-white/10 transition-colors duration-200"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-          >
-            {isMenuOpen ? (
-              <X className="w-6 h-6 text-white" />
-            ) : (
-              <Menu className="w-6 h-6 text-white" />
-            )}
-          </button>
+          {/* 🔹 Carrito y botón hamburguesa en móvil */}
+          <div className="md:hidden flex items-center space-x-2">
+            {/* Carrito siempre visible en móvil */}
+            <button
+              onClick={() => handleNavigate('/cart')}
+              className="relative flex items-center text-white hover:text-yellow-300 transition-colors duration-200 p-2 rounded-lg hover:bg-white/10"
+            >
+              <ShoppingCart className="w-6 h-6" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-yellow-400 text-red-800 text-xs font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+            
+            {/* Botón hamburguesa */}
+            <button
+              className="p-2 rounded-lg hover:bg-white/10 transition-colors duration-200"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+            >
+              {isMenuOpen ? (
+                <X className="w-6 h-6 text-white" />
+              ) : (
+                <Menu className="w-6 h-6 text-white" />
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -165,19 +181,6 @@ const LayoutHeader = ({ user, onLogout, cartCount }) => {
               Inicio
             </button>
 
-            {/* ✅ Carrito con contador en móvil */}
-            <button
-              onClick={() => handleNavigate('/cart')}
-              className="flex items-center w-full text-white hover:text-yellow-300 font-medium py-3 px-4 rounded-lg hover:bg-white/10 transition-colors duration-200"
-            >
-              <ShoppingCart className="w-5 h-5 mr-3" />
-              Carrito
-              {cartCount > 0 && (
-                <span className="ml-auto bg-yellow-400 text-red-800 text-xs font-bold px-2 py-1 rounded-full">
-                  {cartCount}
-                </span>
-              )}
-            </button>
 
             {(isButcher || isAdmin) && (
               <button 

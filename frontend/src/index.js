@@ -6,6 +6,7 @@ import "./styles.css";
 import App from "./App.js";
 import { ToastProvider } from "./context/ToastContext.js";
 import { AuthProvider } from "./context/AuthContext.js";
+import { register } from './utils/serviceWorkerRegistration';
 
 const root = createRoot(document.getElementById("root"));
 root.render(
@@ -19,3 +20,13 @@ root.render(
     </AuthProvider>
   </StrictMode>
 );
+
+// Register service worker
+register({
+  onSuccess: () => {
+    console.log('Service Worker registered successfully');
+  },
+  onUpdate: () => {
+    console.log('Service Worker updated');
+  }
+});

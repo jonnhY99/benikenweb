@@ -21,10 +21,13 @@ export function initSocket(userId) {
   // Crear una nueva conexión. Si hay userId, lo pasamos en el handshake.
   socket = io(API_URL, {
     auth: userId ? { userId } : undefined,
-    transports: ['websocket'],
+    transports: ['websocket', 'polling'],
     autoConnect: true,
     reconnection: true,
     reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+    timeout: 20000,
+    forceNew: true,
   });
 
   // Listener base de debug y notificaciones generales

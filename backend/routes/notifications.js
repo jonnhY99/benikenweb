@@ -26,9 +26,17 @@ router.get('/vapid-public', (req, res) => {
 // Suscribirse a notificaciones push
 router.post('/subscribe', async (req, res) => {
   try {
+    console.log('📥 Recibida solicitud de suscripción:', {
+      hasSubscription: !!req.body.subscription,
+      userEmail: req.body.userEmail,
+      orderId: req.body.orderId,
+      userAgent: req.body.userAgent?.substring(0, 50) + '...'
+    });
+
     const { subscription, userEmail, orderId, userAgent } = req.body;
 
     if (!subscription || !subscription.endpoint || !subscription.keys) {
+      console.error('❌ Datos de suscripción inválidos:', subscription);
       return res.status(400).json({
         success: false,
         error: 'Datos de suscripción inválidos'
@@ -36,6 +44,7 @@ router.post('/subscribe', async (req, res) => {
     }
 
     if (!userEmail) {
+      console.error('❌ Email de usuario faltante');
       return res.status(400).json({
         success: false,
         error: 'Email de usuario requerido'

@@ -7,7 +7,7 @@ dotenv.config();
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 // URL base del cliente (frontend) - usar URL de producción o localhost
-const CLIENT_URL = process.env.CLIENT_URL?.split(',')[0] || 'https://carnesbeniken.onrender.com';
+const CLIENT_URL = process.env.FRONTEND_URL || process.env.CLIENT_URL?.split(',')[0] || 'https://carnesbeniken.onrender.com';
 
 /**
  * Genera el progreso visual del pedido para emails
