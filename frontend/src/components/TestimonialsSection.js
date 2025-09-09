@@ -32,7 +32,7 @@ const TestimonialsSection = () => {
   useEffect(() => {
     const fetchReviews = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/reviews');
+        const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/reviews`);
         if (response.ok) {
           const data = await response.json();
           if (data.reviews && data.reviews.length > 0) {
@@ -53,7 +53,7 @@ const TestimonialsSection = () => {
     try {
       console.log('Sending review data:', reviewData);
       
-      const response = await fetch('http://localhost:5000/api/reviews', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/reviews`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
